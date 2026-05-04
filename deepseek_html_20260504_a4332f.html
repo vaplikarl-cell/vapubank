@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VapuBank</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #0A0A0A; color: #FFFFFF; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 10px; }
+        .container { width: 100%; max-width: 1100px; }
+        .hidden { display: none !important; }
+        .card { background: #1C1C1E; border-radius: 16px; padding: 20px; margin-bottom: 15px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); border: 1px solid #2C2C2E; }
+        h2, h3 { font-weight: 600; margin-bottom: 16px; color: #FFFFFF; }
+        h2 { font-size: 1.5rem; } h3 { font-size: 1.2rem; }
+        .balance-big { font-size: 2.5rem; font-weight: 700; background: linear-gradient(135deg, #34C759, #00C853); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        button { background: #34C759; border: none; color: #FFF; font-weight: 600; padding: 10px 18px; border-radius: 10px; cursor: pointer; font-size: 14px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(52,199,89,0.3); letter-spacing: 0.3px; }
+        button:hover { background: #2DB84F; transform: translateY(-1px); box-shadow: 0 6px 16px rgba(52,199,89,0.5); }
+        button.danger { background: #FF3B30; box-shadow: 0 4px 12px rgba(255,59,48,0.3); }
+        button.danger:hover { background: #E0352B; box-shadow: 0 6px 16px rgba(255,59,48,0.5); }
+        button.secondary { background: #3A3A3C; box-shadow: none; }
+        button.secondary:hover { background: #4A4A4C; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        input, select { background: #2C2C2E; border: 1px solid #3A3A3C; color: #FFF; padding: 10px 14px; border-radius: 10px; font-size: 14px; outline: none; transition: border 0.2s; }
+        input:focus, select:focus { border-color: #34C759; }
+        input::placeholder { color: #8E8E93; }
+        label { display: block; font-weight: 500; margin-bottom: 4px; color: #A1A1A6; text-align: left; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; min-width: 600px; }
+        th { text-align: left; padding: 10px 12px; font-weight: 600; color: #A1A1A6; border-bottom: 1px solid #2C2C2E; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { padding: 10px 12px; border-bottom: 1px solid #2C2C2E; font-size: 13px; }
+        .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -5px; padding: 0 5px; }
+        .flex-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .tab-header { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+        .tab-header button { background: #2C2C2E; color: #FFF; box-shadow: none; padding: 8px 14px; border-radius: 20px; font-size: 13px; }
+        .tab-header button.active { background: #34C759; box-shadow: 0 4px 12px rgba(52,199,89,0.3); }
+        .toast-container { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+        .toast { background: #1C1C1E; border-left: 4px solid #34C759; padding: 12px 18px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); font-weight: 500; animation: slideIn 0.3s ease; min-width: 200px; font-size: 13px; }
+        .toast.error { border-left-color: #FF3B30; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        .login-card { max-width: 400px; margin: 0 auto; text-align: center; }
+        .login-card input { width: 100%; margin-bottom: 12px; }
+        .logo { font-size: 2rem; font-weight: 700; background: linear-gradient(135deg, #34C759, #FFCC00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 20px; }
+        .status-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .status-active { background: #34C75920; color: #34C759; }
+        .status-blocked { background: #FF3B3020; color: #FF3B30; }
+        .discount-badge { background: #FFCC00; color: #0A0A0A; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 12px; margin-left: 6px; }
+        .original-price { text-decoration: line-through; color: #8E8E93; font-size: 12px; margin-right: 4px; }
+        .status-pending { background: #FFCC0020; color: #FFCC00; }
+        .status-ready { background: #34C75920; color: #34C759; }
+        .status-rejected { background: #FF3B3020; color: #FF3B30; }
+        .slot { display: inline-flex; gap: 12px; margin: 15px 0; }
+        .slot-item { width: 70px; height: 70px; background: #2C2C2E; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; font-weight: bold; box-shadow: inset 0 2px 6px rgba(0,0,0,0.5); transition: transform 0.2s; }
+        input[type=range] { width: 100%; margin: 4px 0; }
+        @media (max-width: 768px) { body { padding: 5px; } .card { padding: 15px; } button { padding: 10px 16px; font-size: 13px; } .tab-header button { padding: 8px 12px; font-size: 12px; } input, select { padding: 10px 12px; font-size: 13px; } th, td { padding: 8px 8px; font-size: 11px; } h2 { font-size: 1.3rem; } h3 { font-size: 1.1rem; } .balance-big { font-size: 2rem; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div id="login-screen" class="card login-card">
+        <div class="logo">VapuBank</div>
+        <label for="login-username">Логін</label>
+        <input type="text" id="login-username" placeholder="Введіть логін">
+        <label for="login-password">Пароль</label>
+        <input type="password" id="login-password" placeholder="Введіть пароль">
+        <div style="margin-top: 16px; display: flex; gap: 10px; justify-content: center;">
+            <button onclick="login()">Увійти</button>
+            <button class="secondary" onclick="registerNewUser()">Реєстрація</button>
+        </div>
+    </div>
+
+    <div id="main-screen" class="hidden">
+        <div class="flex-row" style="justify-content: space-between; margin-bottom: 15px;">
+            <h2 style="margin:0;">👤 <span id="current-username"></span></h2>
+            <button class="secondary" onclick="logout()">Вийти</button>
+        </div>
+
+        <div id="admin-panel" class="hidden">
+            <div class="tab-header">
+                <button onclick="showAdminTab('accounts')" id="tab-accounts">Рахунки</button>
+                <button onclick="showAdminTab('products')" id="tab-products">Товари</button>
+                <button onclick="showAdminTab('orders')" id="tab-orders">Замовлення</button>
+                <button onclick="showAdminTab('transfers')" id="tab-transfers">Перекази</button>
+                <button onclick="showAdminTab('casino')" id="tab-casino">🎰 Шанси казино</button>
+                <button onclick="showAdminTab('settings')" id="tab-settings">⚙️ Налаштування</button>
+            </div>
+            <div id="tab-content-accounts" class="card"></div>
+            <div id="tab-content-products" class="card hidden"></div>
+            <div id="tab-content-orders" class="card hidden"></div>
+            <div id="tab-content-transfers" class="card hidden"></div>
+            <div id="tab-content-casino" class="card hidden"></div>
+            <div id="tab-content-settings" class="card hidden"></div>
+        </div>
+
+        <div id="user-panel" class="hidden">
+            <div class="tab-header">
+                <button onclick="showUserTab('home')" id="utab-home">Головна</button>
+                <button onclick="showUserTab('shop')" id="utab-shop">Магазин</button>
+                <button onclick="showUserTab('casino')" id="utab-casino">🎰 Казино</button>
+                <button onclick="showUserTab('cart')" id="utab-cart">Кошик (<span id="cart-count">0</span>)</button>
+                <button onclick="showUserTab('history')" id="utab-history">Історія</button>
+            </div>
+            <div id="utab-content-home" class="card"></div>
+            <div id="utab-content-shop" class="card hidden"></div>
+            <div id="utab-content-casino" class="card hidden"></div>
+            <div id="utab-content-cart" class="card hidden"></div>
+            <div id="utab-content-history" class="card hidden"></div>
+        </div>
+    </div>
+</div>
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+    const LS_USERS = 'bank_users';
+    const LS_PRODUCTS = 'shop_products';
+    const LS_ORDERS = 'orders';
+    const LS_TRANSFERS = 'transfers';
+    const LS_CASHBACK = 'cashback_percent';
+    const LS_CASINO_CHANCES = 'casino_chances';
+
+    let currentUser = null;
+    let userCart = {};
+    let casinoLocked = false;
+
+    function loadUsers() { return JSON.parse(localStorage.getItem(LS_USERS)) || []; }
+    function saveUsers(users) { localStorage.setItem(LS_USERS, JSON.stringify(users)); }
+    function loadProducts() { return JSON.parse(localStorage.getItem(LS_PRODUCTS)) || []; }
+    function saveProducts(products) { localStorage.setItem(LS_PRODUCTS, JSON.stringify(products)); }
+    function loadOrders() { return JSON.parse(localStorage.getItem(LS_ORDERS)) || []; }
+    function saveOrders(orders) { localStorage.setItem(LS_ORDERS, JSON.stringify(orders)); }
+    function loadTransfers() { return JSON.parse(localStorage.getItem(LS_TRANSFERS)) || []; }
+    function saveTransfers(transfers) { localStorage.setItem(LS_TRANSFERS, JSON.stringify(transfers)); }
+    function getCashbackPercent() { return parseFloat(localStorage.getItem(LS_CASHBACK)) || 0; }
+    function setCashbackPercent(val) { localStorage.setItem(LS_CASHBACK, val); }
+    function getCasinoChances() {
+        return JSON.parse(localStorage.getItem(LS_CASINO_CHANCES)) || { jackpot: 1, win: 25, lose: 60, return: 14 };
+    }
+    function setCasinoChances(chances) { localStorage.setItem(LS_CASINO_CHANCES, JSON.stringify(chances)); }
+
+    function initData() {
+        let users = loadUsers();
+        let adminUser = users.find(u => u.role === 'admin');
+        if (adminUser) {
+            adminUser.username = 'vas';
+            adminUser.password = 'kuler';
+        } else {
+            users.push({ username: 'vas', password: 'kuler', role: 'admin', balance: 99999, status: 'active' });
+        }
+        saveUsers(users);
+
+        if (!localStorage.getItem(LS_PRODUCTS)) saveProducts([]);
+        if (!localStorage.getItem(LS_ORDERS)) saveOrders([]);
+        if (!localStorage.getItem(LS_TRANSFERS)) saveTransfers([]);
+        if (!localStorage.getItem(LS_CASHBACK)) setCashbackPercent(0);
+        if (!localStorage.getItem(LS_CASINO_CHANCES)) setCasinoChances({ jackpot: 1, win: 25, lose: 60, return: 14 });
+    }
+
+    // Перевірка, чи не заблоковано поточного користувача, і якщо так — примусовий вихід
+    function checkIfCurrentUserBlocked() {
+        if (currentUser && currentUser.status === 'blocked') {
+            showToast('Ваш акаунт було заблоковано!', 'error');
+            logout();
+        }
+    }
+
+    setInterval(() => {
+        const now = new Date();
+        const orders = loadOrders();
+        const filtered = orders.filter(order => (now - new Date(order.date)) / 3600000 <= 24);
+        if (filtered.length < orders.length) {
+            saveOrders(filtered);
+            if (currentUser && currentUser.role === 'admin') {
+                showToast(`Автоочищення: видалено ${orders.length - filtered.length} старих замовлень.`);
+            }
+        }
+        checkIfCurrentUserBlocked(); // періодична перевірка статусу
+    }, 60000);
+
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type === 'error' ? 'error' : ''}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    function login() {
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value.trim();
+        if (!username || !password) { showToast('Введіть логін та пароль', 'error'); return; }
+        const users = loadUsers();
+        const user = users.find(u => u.username === username && u.password === password);
+        if (!user) { showToast('Невірний логін або пароль', 'error'); return; }
+        if (user.status === 'blocked') { showToast('Ваш акаунт заблоковано', 'error'); return; }
+        currentUser = user;
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('main-screen').classList.remove('hidden');
+        document.getElementById('current-username').textContent = user.username;
+        if (user.role === 'admin') {
+            document.getElementById('admin-panel').classList.remove('hidden');
+            document.getElementById('user-panel').classList.add('hidden');
+            showAdminTab('accounts');
+        } else {
+            document.getElementById('admin-panel').classList.add('hidden');
+            document.getElementById('user-panel').classList.remove('hidden');
+            userCart[user.username] = userCart[user.username] || [];
+            showUserTab('home');
+        }
+        showToast(`Вітаємо, ${user.username}!`);
+    }
+
+    function registerNewUser() {
+        const username = prompt('Логін нового користувача:');
+        if (!username) return;
+        const password = prompt('Пароль:');
+        if (!password) return;
+        const users = loadUsers();
+        if (users.find(u => u.username === username)) { alert('Користувач із таким логіном уже існує'); return; }
+        users.push({ username, password, role: 'user', balance: 0, status: 'active' });
+        saveUsers(users);
+        showToast('Користувача створено! Тепер ви можете увійти.');
+    }
+
+    function logout() {
+        currentUser = null;
+        document.getElementById('login-screen').classList.remove('hidden');
+        document.getElementById('main-screen').classList.add('hidden');
+        document.getElementById('login-username').value = '';
+        document.getElementById('login-password').value = '';
+    }
+
+    function showAdminTab(tab) {
+        ['accounts','products','orders','transfers','casino','settings'].forEach(t => {
+            document.getElementById(`tab-content-${t}`).classList.add('hidden');
+            document.getElementById(`tab-${t}`).classList.remove('active');
+        });
+        document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
+        document.getElementById(`tab-${tab}`).classList.add('active');
+        if (tab === 'accounts') renderAdminAccounts();
+        if (tab === 'products') renderAdminProducts();
+        if (tab === 'orders') renderAdminOrders();
+        if (tab === 'transfers') renderAdminTransfers();
+        if (tab === 'casino') renderAdminCasino();
+        if (tab === 'settings') renderAdminSettings();
+    }
+
+    function renderAdminAccounts() {
+        const users = loadUsers();
+        const container = document.getElementById('tab-content-accounts');
+        let html = `<h3>Керування рахунками</h3><div class="table-wrap"><table><thead><tr><th>Користувач</th><th>Баланс</th><th>Статус</th><th>Зміна балансу</th><th>Дії</th></tr></thead><tbody>`;
+        users.forEach(u => {
+            html += `<tr><td><strong>${escapeHtml(u.username)}</strong> ${u.role==='admin' ? '(адмін)' : ''}</td><td>${u.balance.toFixed(2)} грн</td>
+            <td><span class="status-badge ${u.status==='active' ? 'status-active' : 'status-blocked'}">${u.status}</span></td>
+            <td><div class="flex-row" style="gap:4px;"><input type="number" id="chg-${u.username}" placeholder="Сума" style="width:70px;"><button onclick="changeBalance('${u.username}',1)">+</button><button class="danger" onclick="changeBalance('${u.username}',-1)">-</button></div></td>
+            <td><button class="secondary" onclick="toggleUserStatus('${u.username}')">${u.status==='active' ? 'Заблокувати' : 'Розблокувати'}</button></td></tr>`;
+        });
+        html += `</tbody></table></div><h4 style="margin-top:16px;">Друк грошей</h4><div class="flex-row"><select id="print-user-select">${users.map(u => `<option value="${u.username}">${u.username}</option>`).join('')}</select><input type="number" id="print-amount" placeholder="Сума" value="1000" style="width:100px;"><button onclick="printMoney()">Надрукувати</button></div>`;
+        container.innerHTML = html;
+    }
+
+    function changeBalance(username, sign) {
+        const input = document.getElementById(`chg-${username}`);
+        if (!input) return;
+        const amount = parseFloat(input.value);
+        if (isNaN(amount) || amount <= 0) { showToast('Введіть коректну суму', 'error'); return; }
+        const users = loadUsers();
+        const user = users.find(u => u.username === username);
+        if (!user) return;
+        user.balance += sign * amount;
+        if (user.balance < 0) user.balance = 0;
+        saveUsers(users);
+        renderAdminAccounts();
+        showToast(`Баланс ${username} змінено`);
+    }
+
+    function printMoney() {
+        const username = document.getElementById('print-user-select').value;
+        const amount = parseFloat(document.getElementById('print-amount').value);
+        if (isNaN(amount) || amount <= 0) { showToast('Введіть суму', 'error'); return; }
+        const users = loadUsers();
+        const user = users.find(u => u.username === username);
+        if (!user) return;
+        user.balance += amount;
+        saveUsers(users);
+        renderAdminAccounts();
+        showToast(`Надруковано ${amount.toFixed(2)} грн для ${username}`);
+    }
+
+    function toggleUserStatus(username) {
+        const users = loadUsers();
+        const user = users.find(u => u.username === username);
+        if (!user) return;
+        user.status = user.status === 'active' ? 'blocked' : 'active';
+        saveUsers(users);
+        renderAdminAccounts();
+        checkIfCurrentUserBlocked(); // негайно перевіряємо, чи не заблоковано поточного користувача
+    }
+
+    function renderAdminProducts() {
+        const products = loadProducts();
+        const container = document.getElementById('tab-content-products');
+        let html = `<h3>Товари в магазині</h3>`;
+        if (products.length === 0) html += `<p style="color:#8E8E93;">Наразі жодного товару.</p>`;
+        else {
+            html += `<div class="table-wrap"><table><thead><tr><th>Назва</th><th>Ціна</th><th>Знижка</th><th>Дії</th></tr></thead><tbody>`;
+            products.forEach((p, idx) => {
+                const finalPrice = p.price * (1 - p.discount / 100);
+                html += `<tr><td>${escapeHtml(p.name)}</td><td>${p.discount > 0 ? `<span class="original-price">${p.price.toFixed(2)}</span>` : ''} ${finalPrice.toFixed(2)} грн</td><td>${p.discount}%</td><td class="flex-row" style="gap:4px;"><button onclick="editProduct(${idx})">✏️</button><button class="danger" onclick="deleteProduct(${idx})">🗑️</button></td></tr>`;
+            });
+            html += `</tbody></table></div>`;
+        }
+        html += `<div class="flex-row" style="margin-top:16px;"><input type="text" id="new-name" placeholder="Назва товару"><input type="number" id="new-price" placeholder="Ціна" step="0.01" min="0.01" style="width:100px;"><input type="number" id="new-discount" placeholder="Знижка %" value="0" min="0" max="99" style="width:100px;"><button onclick="addProduct()">Додати товар</button></div>`;
+        container.innerHTML = html;
+    }
+
+    function addProduct() {
+        const name = document.getElementById('new-name').value.trim();
+        const price = parseFloat(document.getElementById('new-price').value);
+        const discount = parseFloat(document.getElementById('new-discount').value) || 0;
+        if (!name || isNaN(price) || price <= 0) { showToast("Заповніть назву та ціну", 'error'); return; }
+        if (discount < 0 || discount > 99) { showToast("Знижка 0-99%", 'error'); return; }
+        const products = loadProducts();
+        products.push({ name, price, discount });
+        saveProducts(products);
+        document.getElementById('new-name').value = '';
+        document.getElementById('new-price').value = '';
+        document.getElementById('new-discount').value = '0';
+        renderAdminProducts();
+        showToast(`Товар "${name}" додано`);
+    }
+
+    function editProduct(index) {
+        const products = loadProducts();
+        const p = products[index];
+        const name = prompt('Нова назва', p.name);
+        if (name === null) return;
+        const price = prompt('Нова ціна', p.price);
+        if (price === null) return;
+        const discount = prompt('Знижка %', p.discount);
+        if (discount === null) return;
+        const newPrice = parseFloat(price);
+        const newDiscount = parseFloat(discount);
+        if (isNaN(newPrice) || newPrice <= 0 || isNaN(newDiscount) || newDiscount < 0 || newDiscount > 99) { showToast('Некоректні дані', 'error'); return; }
+        products[index] = { ...p, name: name.trim() || p.name, price: newPrice, discount: newDiscount };
+        saveProducts(products);
+        renderAdminProducts();
+    }
+
+    function deleteProduct(index) {
+        if (!confirm('Видалити товар?')) return;
+        const products = loadProducts();
+        products.splice(index, 1);
+        saveProducts(products);
+        renderAdminProducts();
+    }
+
+    function rejectOrderAndRefund(orderIndex) {
+        if (!confirm('Відмовити замовлення? Гроші повернуться.')) return;
+        const orders = loadOrders();
+        const order = orders[orderIndex];
+        if (!order || order.status !== 'pending') return;
+        const users = loadUsers();
+        const user = users.find(u => u.username === order.username);
+        if (user) { user.balance += order.price; saveUsers(users); }
+        order.status = 'rejected';
+        saveOrders(orders);
+        renderAdminOrders();
+        showToast(`Замовлення відхилено. ${order.price.toFixed(2)} грн повернуто`);
+    }
+
+    function approveOrder(orderIndex) {
+        if (!confirm('Позначити як готовий?')) return;
+        const orders = loadOrders();
+        const order = orders[orderIndex];
+        if (!order || order.status !== 'pending') return;
+        order.status = 'ready';
+        saveOrders(orders);
+        renderAdminOrders();
+        showToast('Замовлення готове');
+    }
+
+    function deleteOrder(orderIndex) {
+        if (!confirm('Видалити це замовлення назавжди?')) return;
+        const orders = loadOrders();
+        orders.splice(orderIndex, 1);
+        saveOrders(orders);
+        renderAdminOrders();
+    }
+
+    function renderAdminOrders() {
+        const orders = loadOrders();
+        const container = document.getElementById('tab-content-orders');
+        let html = `<h3>Історія замовлень</h3><div class="flex-row" style="margin-bottom:12px;"><input type="text" id="order-filter-user" placeholder="Фільтр за користувачем"><button onclick="renderAdminOrders()">🔍</button><button class="secondary" onclick="exportCSV('orders')">📥 CSV</button></div>`;
+        const filterUser = document.getElementById('order-filter-user')?.value.trim().toLowerCase() || '';
+        const filtered = orders.filter(o => !filterUser || o.username.toLowerCase().includes(filterUser));
+        html += `<div class="table-wrap"><table><thead><tr><th>Користувач</th><th>Товар</th><th>Ціна</th><th>Статус</th><th>Дата</th><th>Дії</th></tr></thead><tbody>`;
+        filtered.forEach(o => {
+            const idx = orders.indexOf(o);
+            const st = o.status || 'pending';
+            const stClass = st === 'ready' ? 'status-ready' : (st === 'rejected' ? 'status-rejected' : 'status-pending');
+            const stLabel = st === 'ready' ? 'Готовий' : (st === 'rejected' ? 'Відмовлено' : 'В обробці');
+            html += `<tr><td>${escapeHtml(o.username)}</td><td>${escapeHtml(o.productName)}</td><td>${o.price.toFixed(2)} грн</td><td><span class="status-badge ${stClass}">${stLabel}</span></td><td>${new Date(o.date).toLocaleString('uk-UA')}</td>
+            <td><div class="flex-row" style="gap:4px;"><button onclick="approveOrder(${idx})" ${st!=='pending'?'disabled':''}>✅</button><button class="danger" onclick="rejectOrderAndRefund(${idx})" ${st!=='pending'?'disabled':''}>❌</button><button onclick="deleteOrder(${idx})">🗑️</button></div></td></tr>`;
+        });
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+    }
+
+    function renderAdminTransfers() {
+        const transfers = loadTransfers();
+        const container = document.getElementById('tab-content-transfers');
+        let html = `<h3>Історія переказів</h3><button class="secondary" onclick="exportCSV('transfers')" style="margin-bottom:12px;">📥 CSV</button><div class="table-wrap"><table><thead><tr><th>Від</th><th>Кому</th><th>Сума</th><th>Дата</th></tr></thead><tbody>`;
+        transfers.forEach(t => { html += `<tr><td>${escapeHtml(t.from)}</td><td>${escapeHtml(t.to)}</td><td>${t.amount.toFixed(2)} грн</td><td>${new Date(t.date).toLocaleString('uk-UA')}</td></tr>`; });
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+    }
+
+    function renderAdminCasino() {
+        const chances = getCasinoChances();
+        const container = document.getElementById('tab-content-casino');
+        container.innerHTML = `
+            <h3>🎰 Шанси казино</h3>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div><label>Джекпот (x10): <span id="jackpot-val">${chances.jackpot}</span>%</label><input type="range" id="jackpot-slider" min="0" max="100" value="${chances.jackpot}" oninput="liveUpdateCasinoSlider()"></div>
+                <div><label>Виграш (x2): <span id="win-val">${chances.win}</span>%</label><input type="range" id="win-slider" min="0" max="100" value="${chances.win}" oninput="liveUpdateCasinoSlider()"></div>
+                <div><label>Повернення: <span id="return-val">${chances.return}</span>%</label><input type="range" id="return-slider" min="0" max="100" value="${chances.return}" oninput="liveUpdateCasinoSlider()"></div>
+                <div><label>Програш: <span id="lose-val">${chances.lose}</span>%</label><input type="range" id="lose-slider" min="0" max="100" value="${chances.lose}" oninput="liveUpdateCasinoSlider()"></div>
+            </div>
+            <div style="margin-top:12px;"><strong>Сума: <span id="chance-total">${chances.jackpot+chances.win+chances.return+chances.lose}</span>%</strong></div>
+            <button onclick="applyCasinoChances()" style="margin-top:10px;">Застосувати шанси</button>
+            <p style="font-size:12px; color:#8E8E93; margin-top:6px;">Повзунки оновлюють відсотки одразу. Кнопка «Застосувати» нормалізує суму до 100%.</p>
+        `;
+    }
+
+    function liveUpdateCasinoSlider() {
+        const jackpot = parseInt(document.getElementById('jackpot-slider').value);
+        const win = parseInt(document.getElementById('win-slider').value);
+        const ret = parseInt(document.getElementById('return-slider').value);
+        const lose = parseInt(document.getElementById('lose-slider').value);
+        document.getElementById('jackpot-val').textContent = jackpot;
+        document.getElementById('win-val').textContent = win;
+        document.getElementById('return-val').textContent = ret;
+        document.getElementById('lose-val').textContent = lose;
+        document.getElementById('chance-total').textContent = jackpot + win + ret + lose;
+    }
+
+    function applyCasinoChances() {
+        const jackpot = parseInt(document.getElementById('jackpot-slider').value);
+        const win = parseInt(document.getElementById('win-slider').value);
+        const ret = parseInt(document.getElementById('return-slider').value);
+        const lose = parseInt(document.getElementById('lose-slider').value);
+        let values = { jackpot, win, return: ret, lose };
+        const total = jackpot + win + ret + lose;
+        if (total === 0) {
+            showToast('Сума не може бути 0%', 'error');
+            return;
+        }
+        values.jackpot = Math.round(jackpot * 100 / total);
+        values.win = Math.round(win * 100 / total);
+        values.return = Math.round(ret * 100 / total);
+        values.lose = 100 - values.jackpot - values.win - values.return;
+        document.getElementById('jackpot-slider').value = values.jackpot;
+        document.getElementById('win-slider').value = values.win;
+        document.getElementById('return-slider').value = values.return;
+        document.getElementById('lose-slider').value = values.lose;
+        liveUpdateCasinoSlider();
+        setCasinoChances(values);
+        showToast('Шанси оновлено та збережено');
+    }
+
+    function renderAdminSettings() {
+        const cashback = getCashbackPercent();
+        const container = document.getElementById('tab-content-settings');
+        container.innerHTML = `<h3>Налаштування магазину</h3><div class="flex-row"><label>Кешбек (%):</label><input type="number" id="cashback-input" value="${cashback}" step="0.1" min="0" max="100" style="width:80px;"><button onclick="updateCashback()">Зберегти</button></div>
+        <div style="margin-top:30px; border-top:1px solid #2C2C2E; padding-top:15px;"><button class="danger" onclick="resetSystem()">🔄 Скинути замовлення та користувачів (крім адміна)</button><p style="color:#8E8E93; font-size:11px; margin-top:4px;">Видаляє всі замовлення, перекази та всіх користувачів, окрім адміністратора. Товари та налаштування лишаються.</p></div>`;
+    }
+
+    function resetSystem() {
+        if (!confirm('Скинути всі замовлення, перекази та видалити всіх користувачів, КРІМ адміністратора?')) return;
+        const users = loadUsers().filter(u => u.role === 'admin');
+        saveUsers(users);
+        saveOrders([]);
+        saveTransfers([]);
+        showToast('Систему скинуто: замовлення, перекази та користувачі видалені (адмін збережений).');
+        if (currentUser && currentUser.role === 'admin') {
+            renderAdminAccounts();
+            renderAdminOrders();
+            renderAdminTransfers();
+        }
+    }
+
+    function updateCashback() {
+        const val = parseFloat(document.getElementById('cashback-input').value);
+        if (isNaN(val) || val < 0 || val > 100) { showToast('Число 0-100', 'error'); return; }
+        setCashbackPercent(val);
+        showToast(`Кешбек ${val}%`);
+    }
+
+    function exportCSV(type) {
+        let data, headers, filename;
+        if (type === 'orders') { data = loadOrders(); headers = ['Користувач','Товар','Ціна','Статус','Дата']; filename = 'orders.csv'; }
+        else { data = loadTransfers(); headers = ['Від','Кому','Сума','Дата']; filename = 'transfers.csv'; }
+        let csv = headers.join(',') + '\n';
+        data.forEach(row => { if (type==='orders') csv += `"${row.username}","${row.productName}",${row.price},"${row.status||'pending'}","${row.date}"\n`; else csv += `"${row.from}","${row.to}",${row.amount},"${row.date}"\n`; });
+        const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function showUserTab(tab) {
+        ['home','shop','casino','cart','history'].forEach(t => {
+            document.getElementById(`utab-content-${t}`).classList.add('hidden');
+            document.getElementById(`utab-${t}`).classList.remove('active');
+        });
+        document.getElementById(`utab-content-${tab}`).classList.remove('hidden');
+        document.getElementById(`utab-${tab}`).classList.add('active');
+        if (tab === 'home') renderUserHome();
+        if (tab === 'shop') renderUserShop();
+        if (tab === 'casino') renderUserCasino();
+        if (tab === 'cart') renderUserCart();
+        if (tab === 'history') renderUserHistory();
+    }
+
+    function refreshCurrentUser() {
+        const users = loadUsers();
+        const fresh = users.find(u => u.username === currentUser.username);
+        if (fresh) {
+            currentUser = fresh;
+            checkIfCurrentUserBlocked();
+        }
+    }
+
+    function renderUserHome() {
+        refreshCurrentUser();
+        const container = document.getElementById('utab-content-home');
+        container.innerHTML = `<h3>Ваш баланс</h3><div class="balance-big">${currentUser.balance.toFixed(2)} грн</div>
+        <div style="margin-top:20px;"><h4>Швидкий переказ</h4><div class="flex-row"><input type="text" id="transfer-to" placeholder="Отримувач"><input type="number" id="transfer-amount" placeholder="Сума" step="0.01" min="0.01" style="width:120px;"><button onclick="makeTransfer()">Відправити</button></div></div>`;
+    }
+
+    function makeTransfer() {
+        const toUser = document.getElementById('transfer-to').value.trim();
+        const amount = parseFloat(document.getElementById('transfer-amount').value);
+        if (!toUser || isNaN(amount) || amount <= 0) { showToast('Заповніть коректно', 'error'); return; }
+        if (toUser === currentUser.username) { showToast('Не можна собі', 'error'); return; }
+        if (amount > currentUser.balance) { showToast('Недостатньо коштів', 'error'); return; }
+        const users = loadUsers();
+        const sender = users.find(u => u.username === currentUser.username);
+        const receiver = users.find(u => u.username === toUser);
+        if (!receiver) { showToast('Отримувача не знайдено', 'error'); return; }
+        if (receiver.status === 'blocked') { showToast('Отримувач заблокований', 'error'); return; }
+        sender.balance -= amount;
+        receiver.balance += amount;
+        saveUsers(users);
+        const transfers = loadTransfers();
+        transfers.push({ from: currentUser.username, to: toUser, amount, date: new Date().toISOString() });
+        saveTransfers(transfers);
+        showToast(`Переказано ${amount.toFixed(2)} грн для ${toUser}`);
+        renderUserHome();
+    }
+
+    function renderUserShop() {
+        refreshCurrentUser();
+        const products = loadProducts();
+        const container = document.getElementById('utab-content-shop');
+        let html = `<h3>Магазин</h3><div class="flex-row" style="margin-bottom:12px;"><input type="text" id="shop-search" placeholder="Пошук товару..." oninput="renderUserShop()"></div>`;
+        if (products.length === 0) html += `<p style="color:#8E8E93;">Немає товарів.</p>`;
+        else {
+            const search = document.getElementById('shop-search')?.value.toLowerCase() || '';
+            const filtered = products.filter(p => p.name.toLowerCase().includes(search));
+            html += `<div class="table-wrap"><table><thead><tr><th>Товар</th><th>Ціна</th><th></th></tr></thead><tbody>`;
+            filtered.forEach(p => {
+                const finalPrice = p.price * (1 - p.discount/100);
+                const idx = products.indexOf(p);
+                html += `<tr><td>${escapeHtml(p.name)} ${p.discount>0?`<span class="discount-badge">-${p.discount}%</span>`:''}</td><td>${p.discount>0?`<span class="original-price">${p.price.toFixed(2)}</span>`:''} ${finalPrice.toFixed(2)} грн</td><td><button onclick="addToCart(${idx})">🛒</button></td></tr>`;
+            });
+            html += `</tbody></table></div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    function addToCart(idx) { if(!currentUser||currentUser.role!=='user')return; if(!userCart[currentUser.username]) userCart[currentUser.username]=[]; userCart[currentUser.username].push(idx); updateCartCount(); showToast('Товар додано'); }
+    function updateCartCount() { document.getElementById('cart-count').textContent = userCart[currentUser.username]?.length||0; }
+
+    function renderUserCart() {
+        refreshCurrentUser();
+        const cart = userCart[currentUser.username] || [];
+        const products = loadProducts();
+        const container = document.getElementById('utab-content-cart');
+        if (cart.length===0) { container.innerHTML=`<h3>Кошик порожній</h3>`; return; }
+        let total=0;
+        let html=`<h3>Кошик</h3><div class="table-wrap"><table><thead><tr><th>Товар</th><th>Ціна</th><th></th></tr></thead><tbody>`;
+        cart.forEach((pidx,cidx)=>{
+            const p=products[pidx];
+            if(!p)return;
+            const price=p.price*(1-p.discount/100);
+            total+=price;
+            html+=`<tr><td>${escapeHtml(p.name)}</td><td>${price.toFixed(2)} грн</td><td><button class="danger" onclick="removeFromCart(${cidx})">✕</button></td></tr>`;
+        });
+        const cashback=getCashbackPercent();
+        const cashAmt=total*cashback/100;
+        html+=`</tbody></table></div><div style="margin-top:12px;font-size:1.1rem;">Загалом: <strong>${total.toFixed(2)} грн</strong></div>${cashback>0?`<div style="color:#34C759;">Кешбек: +${cashAmt.toFixed(2)} грн</div>`:''}<div class="flex-row" style="margin-top:12px;"><button onclick="checkoutCart()">Оформити</button><button class="secondary" onclick="clearCart()">Очистити</button></div>`;
+        container.innerHTML=html;
+    }
+
+    function removeFromCart(cidx){ userCart[currentUser.username].splice(cidx,1); updateCartCount(); renderUserCart(); }
+    function clearCart(){ userCart[currentUser.username]=[]; updateCartCount(); renderUserCart(); }
+
+    function checkoutCart(){
+        const cart=userCart[currentUser.username]||[];
+        if(cart.length===0)return;
+        const products=loadProducts();
+        let total=0;
+        const items=[];
+        for(let idx of cart){
+            const p=products[idx];
+            if(!p)continue;
+            const price=p.price*(1-p.discount/100);
+            total+=price;
+            items.push({name:p.name,price});
+        }
+        if(total>currentUser.balance){ showToast('Недостатньо коштів!','error'); return; }
+        const users=loadUsers();
+        const user=users.find(u=>u.username===currentUser.username);
+        user.balance-=total;
+        const cashback=getCashbackPercent();
+        const cashAmt=total*cashback/100;
+        if(cashAmt>0)user.balance+=cashAmt;
+        saveUsers(users);
+        const orders=loadOrders();
+        items.forEach(item=>orders.push({username:currentUser.username,productName:item.name,price:item.price,status:'pending',date:new Date().toISOString()}));
+        saveOrders(orders);
+        clearCart();
+        refreshCurrentUser();
+        showToast(`Замовлення на ${total.toFixed(2)} грн оформлено!${cashAmt>0?' Кешбек: +'+cashAmt.toFixed(2)+' грн':''}`);
+        renderUserCart(); renderUserHome();
+    }
+
+    function renderUserHistory(){
+        refreshCurrentUser();
+        const orders=loadOrders().filter(o=>o.username===currentUser.username);
+        const transfers=loadTransfers().filter(t=>t.from===currentUser.username||t.to===currentUser.username);
+        const container=document.getElementById('utab-content-history');
+        let html=`<h3>Покупки</h3>`;
+        if(orders.length===0)html+=`<p>Немає</p>`;
+        else{ html+=`<div class="table-wrap"><table><thead><tr><th>Товар</th><th>Ціна</th><th>Статус</th><th>Дата</th></tr></thead><tbody>`;
+            orders.forEach(o=>{ const st=o.status||'pending'; const stClass=st==='ready'?'status-ready':(st==='rejected'?'status-rejected':'status-pending'); const stLabel=st==='ready'?'Готовий':(st==='rejected'?'Відмовлено':'В обробці');
+                html+=`<tr><td>${escapeHtml(o.productName)}</td><td>${o.price.toFixed(2)} грн</td><td><span class="status-badge ${stClass}">${stLabel}</span></td><td>${new Date(o.date).toLocaleString('uk-UA')}</td></tr>`; });
+            html+=`</tbody></table></div>`; }
+        html+=`<h3 style="margin-top:20px;">Перекази</h3>`;
+        if(transfers.length===0)html+=`<p>Немає</p>`;
+        else{ html+=`<div class="table-wrap"><table><thead><tr><th>Тип</th><th>Користувач</th><th>Сума</th><th>Дата</th></tr></thead><tbody>`;
+            transfers.forEach(t=>{ const type=t.from===currentUser.username?'Відправлено':'Отримано'; const other=t.from===currentUser.username?t.to:t.from;
+                html+=`<tr><td>${type}</td><td>${escapeHtml(other)}</td><td>${t.amount.toFixed(2)} грн</td><td>${new Date(t.date).toLocaleString('uk-UA')}</td></tr>`; });
+            html+=`</tbody></table></div>`; }
+        container.innerHTML=html;
+    }
+
+    function renderUserCasino() {
+        refreshCurrentUser();
+        const container = document.getElementById('utab-content-casino');
+        container.innerHTML = `<h3>🎰 Казино «Однорукий бандит»</h3>
+        <p style="margin-bottom:8px;">Ваш баланс: <strong>${currentUser.balance.toFixed(2)} грн</strong></p>
+        <div class="slot" id="slot-row"><div class="slot-item">❓</div><div class="slot-item">❓</div><div class="slot-item">❓</div></div>
+        <div class="flex-row" style="margin-top:12px;"><input type="number" id="bet-amount" placeholder="Ставка" step="0.01" min="1" value="10" style="width:100px;"><button id="spin-btn" onclick="spinSlots()">Крутити</button></div>`;
+    }
+
+    const slotSymbols = ['7️⃣', '🍒', '🍋', '💎', 'BAR'];
+
+    function spinSlots() {
+        if (casinoLocked) return;
+        const bet = parseFloat(document.getElementById('bet-amount').value);
+        if (isNaN(bet) || bet <= 0) { showToast('Введіть ставку', 'error'); return; }
+        if (bet > currentUser.balance) { showToast('Недостатньо коштів', 'error'); return; }
+
+        const users = loadUsers();
+        const user = users.find(u => u.username === currentUser.username);
+        user.balance -= bet;
+        saveUsers(users);
+
+        casinoLocked = true;
+        document.getElementById('spin-btn').disabled = true;
+        const items = document.querySelectorAll('.slot-item');
+        let interval = setInterval(() => {
+            items.forEach(item => { item.textContent = slotSymbols[Math.floor(Math.random() * slotSymbols.length)]; });
+        }, 80);
+
+        setTimeout(() => {
+            clearInterval(interval);
+            const chances = getCasinoChances();
+            const rand = Math.random() * 100;
+            let resultType, comboSymbols;
+            if (rand < chances.jackpot) {
+                resultType = 'jackpot';
+                const sym = slotSymbols[Math.floor(Math.random() * slotSymbols.length)];
+                comboSymbols = [sym, sym, sym];
+            } else if (rand < chances.jackpot + chances.win) {
+                resultType = 'win';
+                const sym1 = slotSymbols[Math.floor(Math.random() * slotSymbols.length)];
+                let sym2 = sym1;
+                let sym3 = slotSymbols[Math.floor(Math.random() * slotSymbols.length)];
+                while (sym3 === sym1) sym3 = slotSymbols[Math.floor(Math.random() * slotSymbols.length)];
+                comboSymbols = [sym1, sym2, sym3];
+            } else if (rand < chances.jackpot + chances.win + chances.lose) {
+                resultType = 'lose';
+                comboSymbols = [];
+                while (comboSymbols.length < 3) {
+                    const s = slotSymbols[Math.floor(Math.random() * slotSymbols.length)];
+                    if (!comboSymbols.includes(s)) comboSymbols.push(s);
+                }
+            } else {
+                resultType = 'return';
+                comboSymbols = [];
+                while (comboSymbols.length < 3) {
+                    const s = slotSymbols[Math.floor(Math.random() * slotSymbols.length)];
+                    if (!comboSymbols.includes(s)) comboSymbols.push(s);
+                }
+            }
+            for (let i = 0; i < 3; i++) items[i].textContent = comboSymbols[i];
+
+            const freshUsers = loadUsers();
+            const freshUser = freshUsers.find(u => u.username === currentUser.username);
+            if (!freshUser) { casinoLocked = false; document.getElementById('spin-btn').disabled = false; return; }
+            let winAmount = 0;
+            if (resultType === 'jackpot') winAmount = bet * 10;
+            else if (resultType === 'win') winAmount = bet * 2;
+            else if (resultType === 'return') winAmount = bet;
+            freshUser.balance += winAmount;
+            saveUsers(freshUsers);
+            currentUser = freshUser;
+            renderUserCasino();
+            showToast(winAmount > 0 ? `Ви виграли ${winAmount.toFixed(2)} грн!` : 'На жаль, програш.');
+            casinoLocked = false;
+            document.getElementById('spin-btn').disabled = false;
+        }, 2000);
+    }
+
+    function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+    initData();
+</script>
+</body>
+</html>
