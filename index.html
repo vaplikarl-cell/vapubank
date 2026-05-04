@@ -52,9 +52,41 @@
         .status-rejected { background: #FF3B3020; color: #FF3B30; }
         .slot { display: inline-flex; gap: 16px; margin: 20px 0; }
         .slot-item { width: 80px; height: 80px; background: #2C2C2E; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: bold; box-shadow: inset 0 2px 8px rgba(0,0,0,0.5); transition: transform 0.2s; }
-        input[type=range] { -webkit-appearance: none; width: 100%; height: 12px; background: #2C2C2E; border-radius: 6px; outline: none; margin: 12px 0; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 32px; height: 32px; background: #34C759; border-radius: 50%; cursor: pointer; box-shadow: 0 0 12px rgba(52,199,89,0.5); transition: transform 0.1s; }
-        input[type=range]::-moz-range-thumb { width: 32px; height: 32px; background: #34C759; border-radius: 50%; cursor: pointer; box-shadow: 0 0 12px rgba(52,199,89,0.5); border: none; }
+        /* Покращені повзунки для мобільних */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 12px;
+            background: #2C2C2E;
+            border-radius: 6px;
+            outline: none;
+            margin: 12px 0;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 32px;
+            height: 32px;
+            background: #34C759;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 12px rgba(52,199,89,0.5);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 32px;
+            height: 32px;
+            background: #34C759;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 12px rgba(52,199,89,0.5);
+            border: none;
+        }
+        /* Збільшена область дотику для телефонів */
+        input[type=range]::-webkit-slider-thumb { touch-action: manipulation; }
+        input[type=range] { touch-action: manipulation; }
         .chat-header { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
         .chat-header select { width: auto; min-width: 140px; }
         .chat-messages { background: #141416; border-radius: 14px; padding: 16px; max-height: 400px; overflow-y: auto; margin-bottom: 16px; }
@@ -82,6 +114,7 @@
 </head>
 <body>
 <div class="container">
+    <!-- Екран входу -->
     <div id="login-screen" class="card login-card">
         <div class="logo">VapuBank</div>
         <label for="login-username">Логін</label>
@@ -93,11 +126,15 @@
             <button class="secondary" onclick="registerNewUser()">Реєстрація</button>
         </div>
     </div>
+
+    <!-- Основний інтерфейс -->
     <div id="main-screen" class="hidden">
         <div class="flex-row" style="justify-content: space-between; margin-bottom: 16px;">
             <h2 style="margin:0;">👤 <span id="current-username"></span></h2>
             <button class="secondary" onclick="logout()">Вийти</button>
         </div>
+
+        <!-- Адмін-панель -->
         <div id="admin-panel" class="hidden">
             <div class="tab-header">
                 <button onclick="showAdminTab('accounts')" id="tab-accounts">Рахунки</button>
@@ -116,6 +153,8 @@
             <div id="tab-content-chat" class="card hidden"></div>
             <div id="tab-content-settings" class="card hidden"></div>
         </div>
+
+        <!-- Панель користувача -->
         <div id="user-panel" class="hidden">
             <div class="tab-header">
                 <button onclick="showUserTab('home')" id="utab-home">Головна</button>
@@ -307,13 +346,20 @@
                 <td><strong>${escapeHtml(u.username)}</strong> ${u.role==='admin' ? '(адмін)' : ''}</td>
                 <td>${u.balance.toFixed(2)} грн</td>
                 <td><span class="status-badge ${u.status==='active' ? 'status-active' : 'status-blocked'}">${u.status}</span></td>
-                <td><div class="btn-group"><input type="number" id="chg-${u.username}" placeholder="Сума" style="width:70px;"><button onclick="changeBalance('${u.username}',1)">+</button><button class="danger" onclick="changeBalance('${u.username}',-1)">-</button></div></td>
+                <td>
+                    <div class="btn-group">
+                        <input type="number" id="chg-${u.username}" placeholder="Сума" style="width:70px;">
+                        <button onclick="changeBalance('${u.username}',1)">+</button>
+                        <button class="danger" onclick="changeBalance('${u.username}',-1)">-</button>
+                    </div>
+                </td>
                 <td><button class="secondary btn-sm" onclick="toggleUserStatus('${u.username}')">${u.status==='active' ? 'Заблокувати' : 'Розблокувати'}</button></td>
             </tr>`;
         });
         html += `</tbody></table></div><h4 style="margin-top:16px;">Друк грошей</h4>
         <div class="flex-row"><select id="print-user-select">${users.map(u => `<option value="${u.username}">${u.username}</option>`).join('')}</select>
-        <input type="number" id="print-amount" placeholder="Сума" value="1000" style="width:100px;"><button onclick="printMoney()">Надрукувати</button></div>`;
+        <input type="number" id="print-amount" placeholder="Сума" value="1000" style="width:100px;">
+        <button onclick="printMoney()">Надрукувати</button></div>`;
         container.innerHTML = html;
     }
 
@@ -518,7 +564,9 @@
         saveOrders([]);
         saveTransfers([]);
         showToast('Скинуто');
-        if (currentUser && currentUser.role === 'admin') { renderAdminAccounts(); renderAdminOrders(); renderAdminTransfers(); }
+        if (currentUser && currentUser.role === 'admin') {
+            renderAdminAccounts(); renderAdminOrders(); renderAdminTransfers();
+        }
     }
     function exportCSV(type) {
         let data, headers, filename;
@@ -537,7 +585,9 @@
         const broadcast = loadBroadcast();
         const privateData = loadPrivate();
         const container = document.getElementById('tab-content-chat');
-        let html = `<h3>💬 Чат (адмін)</h3><div class="chat-header"><select id="admin-chat-select" onchange="adminChatMode=this.value; renderAdminChat()"><option value="broadcast" ${adminChatMode==='broadcast'?'selected':''}>📢 Усім</option>`;
+        let html = `<h3>💬 Чат (адмін)</h3>`;
+        html += `<div class="chat-header"><select id="admin-chat-select" onchange="adminChatMode=this.value; renderAdminChat();">
+            <option value="broadcast" ${adminChatMode==='broadcast'?'selected':''}>📢 Усім</option>`;
         users.forEach(u => html += `<option value="${u.username}" ${adminChatMode===u.username?'selected':''}>${escapeHtml(u.username)}</option>`);
         html += `</select></div><div class="chat-messages" id="admin-chat-messages">`;
         if (adminChatMode === 'broadcast') {
@@ -551,7 +601,12 @@
         const chatDiv = document.getElementById('admin-chat-messages');
         if (chatDiv) chatDiv.scrollTop = chatDiv.scrollHeight;
     }
-    function deleteBroadcast(idx) { const broadcast = loadBroadcast(); broadcast.splice(idx,1); saveBroadcast(broadcast); renderAdminChat(); }
+    function deleteBroadcast(idx) {
+        const broadcast = loadBroadcast();
+        broadcast.splice(idx, 1);
+        saveBroadcast(broadcast);
+        renderAdminChat();
+    }
     function sendAdminMessage() {
         const input = document.getElementById('admin-chat-input');
         const message = input.value.trim();
@@ -578,7 +633,9 @@
         const broadcast = loadBroadcast();
         const privateData = loadPrivate();
         const container = document.getElementById('utab-content-chat');
-        let html = `<h3>💬 Чат</h3><div class="chat-header"><select id="user-chat-select" onchange="userChatWith=this.value; renderUserChat()"><option value="">Оберіть співрозмовника</option>`;
+        let html = `<h3>💬 Чат</h3>`;
+        html += `<div class="chat-header"><select id="user-chat-select" onchange="userChatWith=this.value; renderUserChat();">
+            <option value="">Оберіть співрозмовника</option>`;
         users.forEach(u => html += `<option value="${u.username}" ${userChatWith===u.username?'selected':''}>${escapeHtml(u.username)}</option>`);
         html += `</select></div><div class="chat-messages" id="user-chat-messages">`;
         if (!userChatWith) {
@@ -759,7 +816,9 @@
         casinoLocked = true;
         document.getElementById('spin-btn').disabled = true;
         const items = document.querySelectorAll('.slot-item');
-        let interval = setInterval(() => { items.forEach(item => { item.textContent = slotSymbols[Math.floor(Math.random() * slotSymbols.length)]; }); }, 80);
+        let interval = setInterval(() => {
+            items.forEach(item => { item.textContent = slotSymbols[Math.floor(Math.random() * slotSymbols.length)]; });
+        }, 80);
         setTimeout(() => {
             clearInterval(interval);
             const chances = getCasinoChances();
@@ -789,6 +848,7 @@
 
     function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 
+    // Очищення старих замовлень раз на хвилину
     setInterval(() => {
         const now = new Date();
         const orders = loadOrders();
