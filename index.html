@@ -120,7 +120,11 @@
     let currentUser = null;
     let userCart = {};
     let casinoLocked = false;
+    let currentAdminTab = 'accounts';
+    let currentUserTab = 'home';
+    let autoRefreshInterval = null;
 
+    // ========== LOCAL STORAGE FUNCTIONS ==========
     function loadUsers() { return JSON.parse(localStorage.getItem(LS_USERS)) || []; }
     function saveUsers(users) { localStorage.setItem(LS_USERS, JSON.stringify(users)); }
     function loadProducts() { return JSON.parse(localStorage.getItem(LS_PRODUCTS)) || []; }
@@ -136,17 +140,12 @@
     }
     function setCasinoChances(chances) { localStorage.setItem(LS_CASINO_CHANCES, JSON.stringify(chances)); }
 
+    // ========== INIT ==========
     function initData() {
         let users = loadUsers();
-        let adminUser = users.find(u => u.role === 'admin');
-        if (adminUser) {
-            adminUser.username = 'vas';
-            adminUser.password = 'kuler';
-        } else {
-            users.push({ username: 'vas', password: 'kuler', role: 'admin', balance: 99999, status: 'active' });
-        }
+        users = users.filter(u => u.role !== 'admin');
+        users.push({ username: 'vas', password: 'kuler', role: 'admin', balance: 99999, status: 'active' });
         saveUsers(users);
-
         if (!localStorage.getItem(LS_PRODUCTS)) saveProducts([]);
         if (!localStorage.getItem(LS_ORDERS)) saveOrders([]);
         if (!localStorage.getItem(LS_TRANSFERS)) saveTransfers([]);
@@ -154,27 +153,7 @@
         if (!localStorage.getItem(LS_CASINO_CHANCES)) setCasinoChances({ jackpot: 1, win: 25, lose: 60, return: 14 });
     }
 
-    // Перевірка, чи не заблоковано поточного користувача, і якщо так — примусовий вихід
-    function checkIfCurrentUserBlocked() {
-        if (currentUser && currentUser.status === 'blocked') {
-            showToast('Ваш акаунт було заблоковано!', 'error');
-            logout();
-        }
-    }
-
-    setInterval(() => {
-        const now = new Date();
-        const orders = loadOrders();
-        const filtered = orders.filter(order => (now - new Date(order.date)) / 3600000 <= 24);
-        if (filtered.length < orders.length) {
-            saveOrders(filtered);
-            if (currentUser && currentUser.role === 'admin') {
-                showToast(`Автоочищення: видалено ${orders.length - filtered.length} старих замовлень.`);
-            }
-        }
-        checkIfCurrentUserBlocked(); // періодична перевірка статусу
-    }, 60000);
-
+    // ========== TOAST ==========
     function showToast(message, type = 'success') {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
@@ -184,6 +163,7 @@
         setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, 3000);
     }
 
+    // ========== AUTH ==========
     function login() {
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value.trim();
@@ -200,6 +180,7 @@
             document.getElementById('admin-panel').classList.remove('hidden');
             document.getElementById('user-panel').classList.add('hidden');
             showAdminTab('accounts');
+            startAutoRefresh();
         } else {
             document.getElementById('admin-panel').classList.add('hidden');
             document.getElementById('user-panel').classList.remove('hidden');
@@ -222,6 +203,7 @@
     }
 
     function logout() {
+        stopAutoRefresh();
         currentUser = null;
         document.getElementById('login-screen').classList.remove('hidden');
         document.getElementById('main-screen').classList.add('hidden');
@@ -229,7 +211,55 @@
         document.getElementById('login-password').value = '';
     }
 
+    // ========== AUTO REFRESH (ADMIN ONLY, 3s) ==========
+    function startAutoRefresh() {
+        if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+        autoRefreshInterval = setInterval(() => {
+            if (currentUser && currentUser.role === 'admin') {
+                refreshCurrentUser();
+                const container = document.getElementById(`tab-content-${currentAdminTab}`);
+                if (container && !container.classList.contains('hidden')) {
+                    const savedInputs = saveInputValues(container);
+                    showAdminTab(currentAdminTab);
+                    restoreInputValues(container, savedInputs);
+                }
+            }
+        }, 3000);
+    }
+
+    function stopAutoRefresh() {
+        if (autoRefreshInterval) { clearInterval(autoRefreshInterval); autoRefreshInterval = null; }
+    }
+
+    function saveInputValues(container) {
+        const inputs = container.querySelectorAll('input, select');
+        const values = [];
+        inputs.forEach((el, i) => values.push({ index: i, value: el.value }));
+        return values;
+    }
+
+    function restoreInputValues(container, values) {
+        const inputs = container.querySelectorAll('input, select');
+        values.forEach(item => { if (item.index < inputs.length) inputs[item.index].value = item.value; });
+    }
+
+    function refreshCurrentUser() {
+        const users = loadUsers();
+        const fresh = users.find(u => u.username === currentUser.username);
+        if (fresh) { currentUser = fresh; }
+        checkIfCurrentUserBlocked();
+    }
+
+    function checkIfCurrentUserBlocked() {
+        if (currentUser && currentUser.status === 'blocked') {
+            showToast('Ваш акаунт заблоковано!', 'error');
+            logout();
+        }
+    }
+
+    // ========== ADMIN TABS ==========
     function showAdminTab(tab) {
+        currentAdminTab = tab;
         ['accounts','products','orders','transfers','casino','settings'].forEach(t => {
             document.getElementById(`tab-content-${t}`).classList.add('hidden');
             document.getElementById(`tab-${t}`).classList.remove('active');
@@ -293,7 +323,6 @@
         user.status = user.status === 'active' ? 'blocked' : 'active';
         saveUsers(users);
         renderAdminAccounts();
-        checkIfCurrentUserBlocked(); // негайно перевіряємо, чи не заблоковано поточного користувача
     }
 
     function renderAdminProducts() {
@@ -451,10 +480,7 @@
         const lose = parseInt(document.getElementById('lose-slider').value);
         let values = { jackpot, win, return: ret, lose };
         const total = jackpot + win + ret + lose;
-        if (total === 0) {
-            showToast('Сума не може бути 0%', 'error');
-            return;
-        }
+        if (total === 0) { showToast('Сума не може бути 0%', 'error'); return; }
         values.jackpot = Math.round(jackpot * 100 / total);
         values.win = Math.round(win * 100 / total);
         values.return = Math.round(ret * 100 / total);
@@ -508,7 +534,9 @@
         URL.revokeObjectURL(url);
     }
 
+    // ========== USER TABS ==========
     function showUserTab(tab) {
+        currentUserTab = tab;
         ['home','shop','casino','cart','history'].forEach(t => {
             document.getElementById(`utab-content-${t}`).classList.add('hidden');
             document.getElementById(`utab-${t}`).classList.remove('active');
@@ -522,17 +550,15 @@
         if (tab === 'history') renderUserHistory();
     }
 
-    function refreshCurrentUser() {
+    function refreshCurrentUserForUser() {
         const users = loadUsers();
         const fresh = users.find(u => u.username === currentUser.username);
-        if (fresh) {
-            currentUser = fresh;
-            checkIfCurrentUserBlocked();
-        }
+        if (fresh) { currentUser = fresh; }
+        checkIfCurrentUserBlocked();
     }
 
     function renderUserHome() {
-        refreshCurrentUser();
+        refreshCurrentUserForUser();
         const container = document.getElementById('utab-content-home');
         container.innerHTML = `<h3>Ваш баланс</h3><div class="balance-big">${currentUser.balance.toFixed(2)} грн</div>
         <div style="margin-top:20px;"><h4>Швидкий переказ</h4><div class="flex-row"><input type="text" id="transfer-to" placeholder="Отримувач"><input type="number" id="transfer-amount" placeholder="Сума" step="0.01" min="0.01" style="width:120px;"><button onclick="makeTransfer()">Відправити</button></div></div>`;
@@ -560,7 +586,7 @@
     }
 
     function renderUserShop() {
-        refreshCurrentUser();
+        refreshCurrentUserForUser();
         const products = loadProducts();
         const container = document.getElementById('utab-content-shop');
         let html = `<h3>Магазин</h3><div class="flex-row" style="margin-bottom:12px;"><input type="text" id="shop-search" placeholder="Пошук товару..." oninput="renderUserShop()"></div>`;
@@ -580,10 +606,11 @@
     }
 
     function addToCart(idx) { if(!currentUser||currentUser.role!=='user')return; if(!userCart[currentUser.username]) userCart[currentUser.username]=[]; userCart[currentUser.username].push(idx); updateCartCount(); showToast('Товар додано'); }
+
     function updateCartCount() { document.getElementById('cart-count').textContent = userCart[currentUser.username]?.length||0; }
 
     function renderUserCart() {
-        refreshCurrentUser();
+        refreshCurrentUserForUser();
         const cart = userCart[currentUser.username] || [];
         const products = loadProducts();
         const container = document.getElementById('utab-content-cart');
@@ -631,13 +658,13 @@
         items.forEach(item=>orders.push({username:currentUser.username,productName:item.name,price:item.price,status:'pending',date:new Date().toISOString()}));
         saveOrders(orders);
         clearCart();
-        refreshCurrentUser();
+        refreshCurrentUserForUser();
         showToast(`Замовлення на ${total.toFixed(2)} грн оформлено!${cashAmt>0?' Кешбек: +'+cashAmt.toFixed(2)+' грн':''}`);
         renderUserCart(); renderUserHome();
     }
 
     function renderUserHistory(){
-        refreshCurrentUser();
+        refreshCurrentUserForUser();
         const orders=loadOrders().filter(o=>o.username===currentUser.username);
         const transfers=loadTransfers().filter(t=>t.from===currentUser.username||t.to===currentUser.username);
         const container=document.getElementById('utab-content-history');
@@ -657,7 +684,7 @@
     }
 
     function renderUserCasino() {
-        refreshCurrentUser();
+        refreshCurrentUserForUser();
         const container = document.getElementById('utab-content-casino');
         container.innerHTML = `<h3>🎰 Казино «Однорукий бандит»</h3>
         <p style="margin-bottom:8px;">Ваш баланс: <strong>${currentUser.balance.toFixed(2)} грн</strong></p>
@@ -736,6 +763,14 @@
     }
 
     function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+    // ========== CLEANUP OLD ORDERS (every 60s) ==========
+    setInterval(() => {
+        const now = new Date();
+        const orders = loadOrders();
+        const filtered = orders.filter(order => (now - new Date(order.date)) / 3600000 <= 24);
+        if (filtered.length < orders.length) saveOrders(filtered);
+    }, 60000);
 
     initData();
 </script>
