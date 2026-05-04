@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VapuBank</title>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -55,7 +53,8 @@
         .slot { display: inline-flex; gap: 16px; margin: 20px 0; }
         .slot-item { width: 80px; height: 80px; background: #2C2C2E; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: bold; box-shadow: inset 0 2px 8px rgba(0,0,0,0.5); transition: transform 0.2s; }
         input[type=range] { -webkit-appearance: none; width: 100%; height: 12px; background: #2C2C2E; border-radius: 6px; outline: none; margin: 12px 0; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 32px; height: 32px; background: #34C759; border-radius: 50%; cursor: pointer; box-shadow: 0 0 12px rgba(52,199,89,0.5); }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 32px; height: 32px; background: #34C759; border-radius: 50%; cursor: pointer; box-shadow: 0 0 12px rgba(52,199,89,0.5); transition: transform 0.1s; }
+        input[type=range]::-moz-range-thumb { width: 32px; height: 32px; background: #34C759; border-radius: 50%; cursor: pointer; box-shadow: 0 0 12px rgba(52,199,89,0.5); border: none; }
         .chat-header { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
         .chat-header select { width: auto; min-width: 140px; }
         .chat-messages { background: #141416; border-radius: 14px; padding: 16px; max-height: 400px; overflow-y: auto; margin-bottom: 16px; }
@@ -66,7 +65,19 @@
         .chat-message .admin-badge { background: #34C759; color: #000; font-size: 10px; padding: 2px 6px; border-radius: 8px; margin-left: 6px; font-weight: 700; }
         .chat-input-area { display: flex; gap: 10px; }
         .chat-input-area input { flex: 1; }
-        @media (max-width: 768px) { body { padding: 5px; } .card { padding: 16px; } button { padding: 10px 16px; font-size: 13px; } .tab-header button { padding: 8px 14px; font-size: 12px; } input, select { padding: 10px 14px; font-size: 13px; } th, td { padding: 10px 12px; font-size: 11px; } h2 { font-size: 1.4rem; } h3 { font-size: 1.1rem; } .balance-big { font-size: 2.2rem; } .btn-sm { padding: 6px 10px; font-size: 11px; } .slot-item { width: 60px; height: 60px; font-size: 2rem; } }
+        @media (max-width: 768px) {
+            body { padding: 5px; }
+            .card { padding: 16px; }
+            button { padding: 10px 16px; font-size: 13px; }
+            .tab-header button { padding: 8px 14px; font-size: 12px; }
+            input, select { padding: 10px 14px; font-size: 13px; }
+            th, td { padding: 10px 12px; font-size: 11px; }
+            h2 { font-size: 1.4rem; }
+            h3 { font-size: 1.1rem; }
+            .balance-big { font-size: 2.2rem; }
+            .btn-sm { padding: 6px 10px; font-size: 11px; }
+            .slot-item { width: 60px; height: 60px; font-size: 2rem; }
+        }
     </style>
 </head>
 <body>
@@ -126,23 +137,15 @@
 <div class="toast-container" id="toast-container"></div>
 
 <script>
-    // ⚠️ ЗАМІНІТЬ НА ВАШ КОНФІГ
-    const firebaseConfig = {
-        apiKey: "ВСТАВТЕ_СВІЙ_API_KEY",
-        authDomain: "ВАШ_ПРОЕКТ.firebaseapp.com",
-        databaseURL: "https://ВАШ_ПРОЕКТ-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "ВАШ_ПРОЕКТ",
-        storageBucket: "ВАШ_ПРОЕКТ.appspot.com",
-        messagingSenderId: "000000000000",
-        appId: "1:000000000000:web:xxxxxxxxxxxxx"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    // ⚠️ ВСТАВТЕ СВІЙ ЛОГІН ТА ПАРОЛЬ АДМІНА
-    const ADMIN_USERNAME = 'ВАШ_ЛОГІН';
-    const ADMIN_PASSWORD = 'ВАШ_ПАРОЛЬ';
+    // Ключі localStorage
+    const LS_USERS = 'bank_users';
+    const LS_PRODUCTS = 'shop_products';
+    const LS_ORDERS = 'orders';
+    const LS_TRANSFERS = 'transfers';
+    const LS_CASHBACK = 'cashback_percent';
+    const LS_CASINO_CHANCES = 'casino_chances';
+    const LS_CHAT_BROADCAST = 'chat_broadcast';
+    const LS_CHAT_PRIVATE = 'chat_private';
 
     let currentUser = null;
     let userCart = {};
@@ -151,54 +154,37 @@
     let currentUserTab = 'home';
     let autoRefreshInterval = null;
 
-    // Firebase references
-    const usersRef = db.ref('users');
-    const productsRef = db.ref('products');
-    const ordersRef = db.ref('orders');
-    const transfersRef = db.ref('transfers');
-    const cashbackRef = db.ref('settings/cashback');
-    const casinoRef = db.ref('settings/casino');
-    const broadcastRef = db.ref('chat/broadcast');
-    const privateRef = db.ref('chat/private');
+    // ========== LOCAL STORAGE ==========
+    function loadUsers() { return JSON.parse(localStorage.getItem(LS_USERS)) || []; }
+    function saveUsers(users) { localStorage.setItem(LS_USERS, JSON.stringify(users)); }
+    function loadProducts() { return JSON.parse(localStorage.getItem(LS_PRODUCTS)) || []; }
+    function saveProducts(products) { localStorage.setItem(LS_PRODUCTS, JSON.stringify(products)); }
+    function loadOrders() { return JSON.parse(localStorage.getItem(LS_ORDERS)) || []; }
+    function saveOrders(orders) { localStorage.setItem(LS_ORDERS, JSON.stringify(orders)); }
+    function loadTransfers() { return JSON.parse(localStorage.getItem(LS_TRANSFERS)) || []; }
+    function saveTransfers(transfers) { localStorage.setItem(LS_TRANSFERS, JSON.stringify(transfers)); }
+    function getCashbackPercent() { return parseFloat(localStorage.getItem(LS_CASHBACK)) || 0; }
+    function setCashbackPercent(val) { localStorage.setItem(LS_CASHBACK, val); }
+    function getCasinoChances() { return JSON.parse(localStorage.getItem(LS_CASINO_CHANCES)) || { jackpot: 1, win: 25, lose: 60, return: 14 }; }
+    function setCasinoChances(chances) { localStorage.setItem(LS_CASINO_CHANCES, JSON.stringify(chances)); }
+    function loadBroadcast() { return JSON.parse(localStorage.getItem(LS_CHAT_BROADCAST)) || []; }
+    function saveBroadcast(msgs) { localStorage.setItem(LS_CHAT_BROADCAST, JSON.stringify(msgs)); }
+    function loadPrivate() { return JSON.parse(localStorage.getItem(LS_CHAT_PRIVATE)) || {}; }
+    function savePrivate(priv) { localStorage.setItem(LS_CHAT_PRIVATE, JSON.stringify(priv)); }
 
-    // Функції роботи з Firebase
-    function loadUsers(callback) { usersRef.once('value', snap => callback(snap.val() || {})); }
-    function saveUsers(usersObj) { usersRef.set(usersObj); }
-    function loadProducts(callback) { productsRef.once('value', snap => callback(snap.val() || [])); }
-    function saveProducts(products) { productsRef.set(products); }
-    function loadOrders(callback) { ordersRef.once('value', snap => callback(snap.val() || [])); }
-    function saveOrders(orders) { ordersRef.set(orders); }
-    function loadTransfers(callback) { transfersRef.once('value', snap => callback(snap.val() || [])); }
-    function saveTransfers(transfers) { transfersRef.set(transfers); }
-    function loadCashback(callback) { cashbackRef.once('value', snap => callback(parseFloat(snap.val()) || 0)); }
-    function saveCashback(val) { cashbackRef.set(val); }
-    function loadCasino(callback) { casinoRef.once('value', snap => callback(snap.val() || { jackpot:1, win:25, lose:60, return:14 })); }
-    function saveCasino(chances) { casinoRef.set(chances); }
-    function loadBroadcast(callback) { broadcastRef.once('value', snap => callback(snap.val() || [])); }
-    function saveBroadcast(msgs) { broadcastRef.set(msgs); }
-    function loadPrivate(callback) { privateRef.once('value', snap => callback(snap.val() || {})); }
-    function savePrivate(priv) { privateRef.set(priv); }
-
+    // ========== INIT ==========
     function initData() {
-        loadUsers(usersObj => {
-            if (!usersObj || !Object.keys(usersObj).length) {
-                const newUsers = {};
-                newUsers[ADMIN_USERNAME] = { username: ADMIN_USERNAME, password: ADMIN_PASSWORD, role: 'admin', balance: 99999, status: 'active' };
-                saveUsers(newUsers);
-            } else {
-                if (!Object.values(usersObj).find(u => u.role === 'admin')) {
-                    usersObj[ADMIN_USERNAME] = { username: ADMIN_USERNAME, password: ADMIN_PASSWORD, role: 'admin', balance: 99999, status: 'active' };
-                    saveUsers(usersObj);
-                }
-            }
-        });
-        loadProducts(prods => { if (!prods || !prods.length) saveProducts([]); });
-        loadOrders(ords => { if (!ords) saveOrders([]); });
-        loadTransfers(tr => { if (!tr) saveTransfers([]); });
-        loadCashback(c => { if (isNaN(c)) saveCashback(0); });
-        loadCasino(c => { if (!c) saveCasino({ jackpot:1, win:25, lose:60, return:14 }); });
-        loadBroadcast(b => { if (!b) saveBroadcast([]); });
-        loadPrivate(p => { if (!p) savePrivate({}); });
+        let users = loadUsers();
+        users = users.filter(u => u.role !== 'admin');
+        users.push({ username: 'vas', password: 'kuler', role: 'admin', balance: 99999, status: 'active' });
+        saveUsers(users);
+        if (!localStorage.getItem(LS_PRODUCTS)) saveProducts([]);
+        if (!localStorage.getItem(LS_ORDERS)) saveOrders([]);
+        if (!localStorage.getItem(LS_TRANSFERS)) saveTransfers([]);
+        if (!localStorage.getItem(LS_CASHBACK)) setCashbackPercent(0);
+        if (!localStorage.getItem(LS_CASINO_CHANCES)) setCasinoChances({ jackpot: 1, win: 25, lose: 60, return: 14 });
+        if (!localStorage.getItem(LS_CHAT_BROADCAST)) saveBroadcast([]);
+        if (!localStorage.getItem(LS_CHAT_PRIVATE)) savePrivate({});
     }
 
     function showToast(message, type = 'success') {
@@ -210,31 +196,31 @@
         setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, 3000);
     }
 
+    // ========== AUTH ==========
     function login() {
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value.trim();
         if (!username || !password) { showToast('Введіть логін та пароль', 'error'); return; }
-        loadUsers(usersObj => {
-            const user = Object.values(usersObj).find(u => u.username === username && u.password === password);
-            if (!user) { showToast('Невірний логін або пароль', 'error'); return; }
-            if (user.status === 'blocked') { showToast('Акаунт заблоковано', 'error'); return; }
-            currentUser = user;
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('main-screen').classList.remove('hidden');
-            document.getElementById('current-username').textContent = user.username;
-            if (user.role === 'admin') {
-                document.getElementById('admin-panel').classList.remove('hidden');
-                document.getElementById('user-panel').classList.add('hidden');
-                showAdminTab('accounts');
-                startAutoRefresh();
-            } else {
-                document.getElementById('admin-panel').classList.add('hidden');
-                document.getElementById('user-panel').classList.remove('hidden');
-                userCart[user.username] = userCart[user.username] || [];
-                showUserTab('home');
-            }
-            showToast(`Вітаємо, ${user.username}!`);
-        });
+        const users = loadUsers();
+        const user = users.find(u => u.username === username && u.password === password);
+        if (!user) { showToast('Невірний логін або пароль', 'error'); return; }
+        if (user.status === 'blocked') { showToast('Акаунт заблоковано', 'error'); return; }
+        currentUser = user;
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('main-screen').classList.remove('hidden');
+        document.getElementById('current-username').textContent = user.username;
+        if (user.role === 'admin') {
+            document.getElementById('admin-panel').classList.remove('hidden');
+            document.getElementById('user-panel').classList.add('hidden');
+            showAdminTab('accounts');
+            startAutoRefresh();
+        } else {
+            document.getElementById('admin-panel').classList.add('hidden');
+            document.getElementById('user-panel').classList.remove('hidden');
+            userCart[user.username] = userCart[user.username] || [];
+            showUserTab('home');
+        }
+        showToast(`Вітаємо, ${user.username}!`);
     }
 
     function registerNewUser() {
@@ -242,12 +228,11 @@
         if (!username) return;
         const password = prompt('Пароль:');
         if (!password) return;
-        loadUsers(usersObj => {
-            if (Object.values(usersObj).find(u => u.username === username)) { alert('Користувач існує'); return; }
-            usersObj[username] = { username, password, role: 'user', balance: 0, status: 'active' };
-            saveUsers(usersObj);
-            showToast('Користувача створено!');
-        });
+        const users = loadUsers();
+        if (users.find(u => u.username === username)) { alert('Користувач існує'); return; }
+        users.push({ username, password, role: 'user', balance: 0, status: 'active' });
+        saveUsers(users);
+        showToast('Користувача створено!');
     }
 
     function logout() {
@@ -259,10 +244,12 @@
         document.getElementById('login-password').value = '';
     }
 
+    // ========== AUTO REFRESH (ADMIN) ==========
     function startAutoRefresh() {
         if (autoRefreshInterval) clearInterval(autoRefreshInterval);
         autoRefreshInterval = setInterval(() => {
             if (currentUser && currentUser.role === 'admin') {
+                refreshCurrentUser();
                 const container = document.getElementById(`tab-content-${currentAdminTab}`);
                 if (container && !container.classList.contains('hidden')) {
                     const saved = saveInputValues(container);
@@ -273,19 +260,542 @@
         }, 3000);
     }
     function stopAutoRefresh() { if (autoRefreshInterval) { clearInterval(autoRefreshInterval); autoRefreshInterval = null; } }
-    function saveInputValues(container) { const inputs = container.querySelectorAll('input, select'); const vals = []; inputs.forEach((el, i) => vals.push({ index: i, value: el.value })); return vals; }
-    function restoreInputValues(container, vals) { const inputs = container.querySelectorAll('input, select'); vals.forEach(item => { if (item.index < inputs.length) inputs[item.index].value = item.value; }); }
+    function saveInputValues(container) {
+        const inputs = container.querySelectorAll('input, select');
+        const vals = [];
+        inputs.forEach((el, i) => vals.push({ index: i, value: el.value }));
+        return vals;
+    }
+    function restoreInputValues(container, vals) {
+        const inputs = container.querySelectorAll('input, select');
+        vals.forEach(item => { if (item.index < inputs.length) inputs[item.index].value = item.value; });
+    }
+    function refreshCurrentUser() {
+        const users = loadUsers();
+        const fresh = users.find(u => u.username === currentUser.username);
+        if (fresh) currentUser = fresh;
+        checkIfUserBlocked();
+    }
+    function checkIfUserBlocked() {
+        if (currentUser && currentUser.status === 'blocked') { showToast('Акаунт заблоковано!', 'error'); logout(); }
+    }
 
-    // Адмін-вкладки та інші функції (скорочено для інструкції)
-    // Повний код можна взяти з попередньої відповіді, замінивши localStorage на Firebase.
-    // Тут наведено лише ключові моменти для розуміння структури.
+    // ========== ADMIN TABS ==========
+    function showAdminTab(tab) {
+        currentAdminTab = tab;
+        ['accounts','products','orders','transfers','casino','chat','settings'].forEach(t => {
+            document.getElementById(`tab-content-${t}`).classList.add('hidden');
+            document.getElementById(`tab-${t}`).classList.remove('active');
+        });
+        document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
+        document.getElementById(`tab-${tab}`).classList.add('active');
+        if (tab === 'accounts') renderAdminAccounts();
+        if (tab === 'products') renderAdminProducts();
+        if (tab === 'orders') renderAdminOrders();
+        if (tab === 'transfers') renderAdminTransfers();
+        if (tab === 'casino') renderAdminCasino();
+        if (tab === 'chat') renderAdminChat();
+        if (tab === 'settings') renderAdminSettings();
+    }
 
-    function showAdminTab(tab) { /* ... як у попередній версії ... */ }
-    function renderAdminAccounts() { /* ... */ }
-    // ... далі йдуть решта функцій, які вже були реалізовані у попередньому повному коді.
+    function renderAdminAccounts() {
+        const users = loadUsers();
+        const container = document.getElementById('tab-content-accounts');
+        let html = `<h3>Керування рахунками</h3><div class="table-wrap"><table><thead><tr><th>Користувач</th><th>Баланс</th><th>Статус</th><th>Зміна балансу</th><th>Дії</th></tr></thead><tbody>`;
+        users.forEach(u => {
+            html += `<tr>
+                <td><strong>${escapeHtml(u.username)}</strong> ${u.role==='admin' ? '(адмін)' : ''}</td>
+                <td>${u.balance.toFixed(2)} грн</td>
+                <td><span class="status-badge ${u.status==='active' ? 'status-active' : 'status-blocked'}">${u.status}</span></td>
+                <td><div class="btn-group"><input type="number" id="chg-${u.username}" placeholder="Сума" style="width:70px;"><button onclick="changeBalance('${u.username}',1)">+</button><button class="danger" onclick="changeBalance('${u.username}',-1)">-</button></div></td>
+                <td><button class="secondary btn-sm" onclick="toggleUserStatus('${u.username}')">${u.status==='active' ? 'Заблокувати' : 'Розблокувати'}</button></td>
+            </tr>`;
+        });
+        html += `</tbody></table></div><h4 style="margin-top:16px;">Друк грошей</h4>
+        <div class="flex-row"><select id="print-user-select">${users.map(u => `<option value="${u.username}">${u.username}</option>`).join('')}</select>
+        <input type="number" id="print-amount" placeholder="Сума" value="1000" style="width:100px;"><button onclick="printMoney()">Надрукувати</button></div>`;
+        container.innerHTML = html;
+    }
 
-    // Заглушка для демонстрації:
+    function changeBalance(username, sign) {
+        const input = document.getElementById(`chg-${username}`);
+        if (!input) return;
+        const amount = parseFloat(input.value);
+        if (isNaN(amount) || amount <= 0) { showToast('Введіть коректну суму', 'error'); return; }
+        const users = loadUsers();
+        const user = users.find(u => u.username === username);
+        if (!user) return;
+        user.balance += sign * amount;
+        if (user.balance < 0) user.balance = 0;
+        saveUsers(users);
+        renderAdminAccounts();
+        showToast(`Баланс ${username} змінено`);
+    }
+    function printMoney() {
+        const username = document.getElementById('print-user-select').value;
+        const amount = parseFloat(document.getElementById('print-amount').value);
+        if (isNaN(amount) || amount <= 0) { showToast('Введіть суму', 'error'); return; }
+        const users = loadUsers();
+        const user = users.find(u => u.username === username);
+        if (!user) return;
+        user.balance += amount;
+        saveUsers(users);
+        renderAdminAccounts();
+        showToast(`Надруковано ${amount.toFixed(2)} грн для ${username}`);
+    }
+    function toggleUserStatus(username) {
+        const users = loadUsers();
+        const user = users.find(u => u.username === username);
+        if (!user) return;
+        user.status = user.status === 'active' ? 'blocked' : 'active';
+        saveUsers(users);
+        renderAdminAccounts();
+    }
+
+    function renderAdminProducts() {
+        const products = loadProducts();
+        const container = document.getElementById('tab-content-products');
+        let html = `<h3>Товари в магазині</h3>`;
+        if (products.length === 0) html += `<p style="color:#8E8E93;">Немає товарів.</p>`;
+        else {
+            html += `<div class="table-wrap"><table><thead><tr><th>Назва</th><th>Ціна</th><th>Знижка</th><th>Дії</th></tr></thead><tbody>`;
+            products.forEach((p, idx) => {
+                const finalPrice = p.price * (1 - p.discount / 100);
+                html += `<tr><td>${escapeHtml(p.name)}</td><td>${p.discount > 0 ? `<span class="original-price">${p.price.toFixed(2)}</span>` : ''} ${finalPrice.toFixed(2)} грн</td><td>${p.discount}%</td><td class="btn-group"><button class="btn-sm" onclick="editProduct(${idx})">✏️</button><button class="danger btn-sm" onclick="deleteProduct(${idx})">🗑️</button></td></tr>`;
+            });
+            html += `</tbody></table></div>`;
+        }
+        html += `<div class="flex-row" style="margin-top:16px;"><input type="text" id="new-name" placeholder="Назва"><input type="number" id="new-price" placeholder="Ціна" step="0.01" min="0.01" style="width:100px;"><input type="number" id="new-discount" placeholder="Знижка %" value="0" min="0" max="99" style="width:100px;"><button onclick="addProduct()">Додати</button></div>`;
+        container.innerHTML = html;
+    }
+    function addProduct() {
+        const name = document.getElementById('new-name').value.trim();
+        const price = parseFloat(document.getElementById('new-price').value);
+        const discount = parseFloat(document.getElementById('new-discount').value) || 0;
+        if (!name || isNaN(price) || price <= 0) { showToast("Заповніть назву та ціну", 'error'); return; }
+        if (discount < 0 || discount > 99) { showToast("Знижка 0-99%", 'error'); return; }
+        const products = loadProducts();
+        products.push({ name, price, discount });
+        saveProducts(products);
+        document.getElementById('new-name').value = '';
+        document.getElementById('new-price').value = '';
+        document.getElementById('new-discount').value = '0';
+        renderAdminProducts();
+        showToast(`Товар "${name}" додано`);
+    }
+    function editProduct(index) {
+        const products = loadProducts();
+        const p = products[index];
+        const name = prompt('Нова назва', p.name);
+        if (name === null) return;
+        const price = prompt('Нова ціна', p.price);
+        if (price === null) return;
+        const discount = prompt('Знижка %', p.discount);
+        if (discount === null) return;
+        const newPrice = parseFloat(price);
+        const newDiscount = parseFloat(discount);
+        if (isNaN(newPrice) || newPrice <= 0 || isNaN(newDiscount) || newDiscount < 0 || newDiscount > 99) { showToast('Некоректні дані', 'error'); return; }
+        products[index] = { ...p, name: name.trim() || p.name, price: newPrice, discount: newDiscount };
+        saveProducts(products);
+        renderAdminProducts();
+    }
+    function deleteProduct(index) {
+        if (!confirm('Видалити товар?')) return;
+        const products = loadProducts();
+        products.splice(index, 1);
+        saveProducts(products);
+        renderAdminProducts();
+    }
+    function renderAdminOrders() {
+        const orders = loadOrders();
+        const container = document.getElementById('tab-content-orders');
+        let html = `<h3>Історія замовлень</h3><div class="flex-row"><input type="text" id="order-filter-user" placeholder="Фільтр за користувачем"><button onclick="renderAdminOrders()">🔍</button><button class="secondary" onclick="exportCSV('orders')">📥 CSV</button></div>`;
+        const filter = document.getElementById('order-filter-user')?.value.trim().toLowerCase() || '';
+        const filtered = orders.filter(o => !filter || o.username.toLowerCase().includes(filter));
+        html += `<div class="table-wrap"><table><thead><tr><th>Користувач</th><th>Товар</th><th>Ціна</th><th>Статус</th><th>Дата</th><th>Дії</th></tr></thead><tbody>`;
+        filtered.forEach(o => {
+            const idx = orders.indexOf(o);
+            const st = o.status || 'pending';
+            html += `<tr><td>${escapeHtml(o.username)}</td><td>${escapeHtml(o.productName)}</td><td>${o.price.toFixed(2)} грн</td><td><span class="status-badge ${st==='ready'?'status-ready':(st==='rejected'?'status-rejected':'status-pending')}">${st==='ready'?'Готовий':(st==='rejected'?'Відмовлено':'В обробці')}</span></td><td>${new Date(o.date).toLocaleString('uk-UA')}</td>
+            <td><div class="btn-group"><button class="btn-sm" onclick="approveOrder(${idx})" ${st!=='pending'?'disabled':''}>✅</button><button class="danger btn-sm" onclick="rejectOrderAndRefund(${idx})" ${st!=='pending'?'disabled':''}>❌</button><button class="btn-sm" onclick="deleteOrder(${idx})">🗑️</button></div></td></tr>`;
+        });
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+    }
+    function rejectOrderAndRefund(idx) {
+        if (!confirm('Відмовити та повернути кошти?')) return;
+        const orders = loadOrders();
+        const o = orders[idx];
+        if (!o || o.status !== 'pending') return;
+        const users = loadUsers();
+        const user = users.find(u => u.username === o.username);
+        if (user) { user.balance += o.price; saveUsers(users); }
+        o.status = 'rejected';
+        saveOrders(orders);
+        renderAdminOrders();
+    }
+    function approveOrder(idx) {
+        if (!confirm('Позначити як готовий?')) return;
+        const orders = loadOrders();
+        if (orders[idx]) { orders[idx].status = 'ready'; saveOrders(orders); }
+        renderAdminOrders();
+    }
+    function deleteOrder(idx) {
+        if (!confirm('Видалити замовлення?')) return;
+        const orders = loadOrders();
+        orders.splice(idx, 1);
+        saveOrders(orders);
+        renderAdminOrders();
+    }
+    function renderAdminTransfers() {
+        const transfers = loadTransfers();
+        const container = document.getElementById('tab-content-transfers');
+        let html = `<h3>Історія переказів</h3><button class="secondary" onclick="exportCSV('transfers')">📥 CSV</button><div class="table-wrap"><table><thead><tr><th>Від</th><th>Кому</th><th>Сума</th><th>Дата</th></tr></thead><tbody>`;
+        transfers.forEach(t => html += `<tr><td>${escapeHtml(t.from)}</td><td>${escapeHtml(t.to)}</td><td>${t.amount.toFixed(2)} грн</td><td>${new Date(t.date).toLocaleString('uk-UA')}</td></tr>`);
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+    }
+    function renderAdminCasino() {
+        const chances = getCasinoChances();
+        const container = document.getElementById('tab-content-casino');
+        container.innerHTML = `<h3>🎰 Шанси казино</h3>
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div><label>Джекпот (x10): <span id="jackpot-val">${chances.jackpot}</span>%</label><input type="range" id="jackpot-slider" min="0" max="100" value="${chances.jackpot}" oninput="liveUpdateCasinoSlider()"></div>
+            <div><label>Виграш (x2): <span id="win-val">${chances.win}</span>%</label><input type="range" id="win-slider" min="0" max="100" value="${chances.win}" oninput="liveUpdateCasinoSlider()"></div>
+            <div><label>Повернення: <span id="return-val">${chances.return}</span>%</label><input type="range" id="return-slider" min="0" max="100" value="${chances.return}" oninput="liveUpdateCasinoSlider()"></div>
+            <div><label>Програш: <span id="lose-val">${chances.lose}</span>%</label><input type="range" id="lose-slider" min="0" max="100" value="${chances.lose}" oninput="liveUpdateCasinoSlider()"></div>
+        </div>
+        <div style="margin-top:12px;"><strong>Сума: <span id="chance-total">${chances.jackpot+chances.win+chances.return+chances.lose}</span>%</strong></div>
+        <button onclick="applyCasinoChances()" style="margin-top:12px;">Застосувати шанси</button>`;
+    }
+    function liveUpdateCasinoSlider() {
+        const j = parseInt(document.getElementById('jackpot-slider').value);
+        const w = parseInt(document.getElementById('win-slider').value);
+        const r = parseInt(document.getElementById('return-slider').value);
+        const l = parseInt(document.getElementById('lose-slider').value);
+        document.getElementById('jackpot-val').textContent = j;
+        document.getElementById('win-val').textContent = w;
+        document.getElementById('return-val').textContent = r;
+        document.getElementById('lose-val').textContent = l;
+        document.getElementById('chance-total').textContent = j+w+r+l;
+    }
+    function applyCasinoChances() {
+        const j = parseInt(document.getElementById('jackpot-slider').value);
+        const w = parseInt(document.getElementById('win-slider').value);
+        const r = parseInt(document.getElementById('return-slider').value);
+        const l = parseInt(document.getElementById('lose-slider').value);
+        let vals = { jackpot: j, win: w, return: r, lose: l };
+        const total = j+w+r+l;
+        if (total === 0) { showToast('Сума не може бути 0%', 'error'); return; }
+        vals.jackpot = Math.round(j*100/total);
+        vals.win = Math.round(w*100/total);
+        vals.return = Math.round(r*100/total);
+        vals.lose = 100 - vals.jackpot - vals.win - vals.return;
+        document.getElementById('jackpot-slider').value = vals.jackpot;
+        document.getElementById('win-slider').value = vals.win;
+        document.getElementById('return-slider').value = vals.return;
+        document.getElementById('lose-slider').value = vals.lose;
+        liveUpdateCasinoSlider();
+        setCasinoChances(vals);
+        showToast('Шанси оновлено');
+    }
+    function renderAdminSettings() {
+        const cashback = getCashbackPercent();
+        const container = document.getElementById('tab-content-settings');
+        container.innerHTML = `<h3>Налаштування магазину</h3><div class="flex-row"><label>Кешбек (%):</label><input type="number" id="cashback-input" value="${cashback}" step="0.1" min="0" max="100" style="width:80px;"><button onclick="updateCashback()">Зберегти</button></div>
+        <div style="margin-top:30px;"><button class="danger" onclick="resetSystem()">🔄 Скинути замовлення та користувачів (крім адміна)</button></div>`;
+    }
+    function updateCashback() {
+        const val = parseFloat(document.getElementById('cashback-input').value);
+        if (isNaN(val) || val < 0 || val > 100) { showToast('Число 0-100', 'error'); return; }
+        setCashbackPercent(val);
+        showToast(`Кешбек ${val}%`);
+    }
+    function resetSystem() {
+        if (!confirm('Видалити всі замовлення, перекази та користувачів (крім адміна)?')) return;
+        const users = loadUsers().filter(u => u.role === 'admin');
+        saveUsers(users);
+        saveOrders([]);
+        saveTransfers([]);
+        showToast('Скинуто');
+        if (currentUser && currentUser.role === 'admin') { renderAdminAccounts(); renderAdminOrders(); renderAdminTransfers(); }
+    }
+    function exportCSV(type) {
+        let data, headers, filename;
+        if (type === 'orders') { data = loadOrders(); headers = ['Користувач','Товар','Ціна','Статус','Дата']; filename = 'orders.csv'; }
+        else { data = loadTransfers(); headers = ['Від','Кому','Сума','Дата']; filename = 'transfers.csv'; }
+        let csv = headers.join(',') + '\n';
+        data.forEach(row => { if (type==='orders') csv += `"${row.username}","${row.productName}",${row.price},"${row.status||'pending'}","${row.date}"\n`; else csv += `"${row.from}","${row.to}",${row.amount},"${row.date}"\n`; });
+        const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+    }
+
+    // ========== CHAT ADMIN ==========
+    let adminChatMode = 'broadcast';
+    function renderAdminChat() {
+        const users = loadUsers().filter(u => u.role !== 'admin');
+        const broadcast = loadBroadcast();
+        const privateData = loadPrivate();
+        const container = document.getElementById('tab-content-chat');
+        let html = `<h3>💬 Чат (адмін)</h3><div class="chat-header"><select id="admin-chat-select" onchange="adminChatMode=this.value; renderAdminChat()"><option value="broadcast" ${adminChatMode==='broadcast'?'selected':''}>📢 Усім</option>`;
+        users.forEach(u => html += `<option value="${u.username}" ${adminChatMode===u.username?'selected':''}>${escapeHtml(u.username)}</option>`);
+        html += `</select></div><div class="chat-messages" id="admin-chat-messages">`;
+        if (adminChatMode === 'broadcast') {
+            broadcast.forEach((msg,idx) => html += `<div class="chat-message broadcast"><span class="username">${escapeHtml(msg.from)}</span><span class="admin-badge">адмін</span><span class="time">${new Date(msg.date).toLocaleString('uk-UA')}</span><br>${escapeHtml(msg.message)}<button class="danger btn-sm" style="padding:2px 6px; margin-left:8px;" onclick="deleteBroadcast(${idx})">✕</button></div>`);
+        } else {
+            const msgs = privateData[adminChatMode] || [];
+            msgs.forEach(msg => html += `<div class="chat-message"><span class="username">${escapeHtml(msg.from)}</span>${msg.from!=='admin'?'':'<span class="admin-badge">адмін</span>'}<span class="time">${new Date(msg.date).toLocaleString('uk-UA')}</span><br>${escapeHtml(msg.message)}</div>`);
+        }
+        html += `</div><div class="chat-input-area"><input type="text" id="admin-chat-input" placeholder="Повідомлення..."><button onclick="sendAdminMessage()">Надіслати</button></div>`;
+        container.innerHTML = html;
+        const chatDiv = document.getElementById('admin-chat-messages');
+        if (chatDiv) chatDiv.scrollTop = chatDiv.scrollHeight;
+    }
+    function deleteBroadcast(idx) { const broadcast = loadBroadcast(); broadcast.splice(idx,1); saveBroadcast(broadcast); renderAdminChat(); }
+    function sendAdminMessage() {
+        const input = document.getElementById('admin-chat-input');
+        const message = input.value.trim();
+        if (!message) return;
+        if (adminChatMode === 'broadcast') {
+            const broadcast = loadBroadcast();
+            broadcast.push({ from: currentUser.username, message, date: new Date().toISOString() });
+            saveBroadcast(broadcast);
+        } else {
+            const privateData = loadPrivate();
+            if (!privateData[adminChatMode]) privateData[adminChatMode] = [];
+            privateData[adminChatMode].push({ from: currentUser.username, message, date: new Date().toISOString() });
+            savePrivate(privateData);
+        }
+        input.value = '';
+        renderAdminChat();
+    }
+
+    // ========== CHAT USER ==========
+    let userChatWith = null;
+    function renderUserChat() {
+        refreshCurrentUser();
+        const users = loadUsers().filter(u => u.username !== currentUser.username);
+        const broadcast = loadBroadcast();
+        const privateData = loadPrivate();
+        const container = document.getElementById('utab-content-chat');
+        let html = `<h3>💬 Чат</h3><div class="chat-header"><select id="user-chat-select" onchange="userChatWith=this.value; renderUserChat()"><option value="">Оберіть співрозмовника</option>`;
+        users.forEach(u => html += `<option value="${u.username}" ${userChatWith===u.username?'selected':''}>${escapeHtml(u.username)}</option>`);
+        html += `</select></div><div class="chat-messages" id="user-chat-messages">`;
+        if (!userChatWith) {
+            broadcast.forEach(msg => html += `<div class="chat-message broadcast"><span class="username">${escapeHtml(msg.from)}</span><span class="admin-badge">адмін</span><span class="time">${new Date(msg.date).toLocaleString('uk-UA')}</span><br>${escapeHtml(msg.message)}</div>`);
+        } else {
+            const msgs = privateData[userChatWith] || [];
+            msgs.forEach(msg => {
+                const isAdmin = msg.from === 'admin';
+                html += `<div class="chat-message"><span class="username">${escapeHtml(msg.from)}</span>${isAdmin?'<span class="admin-badge">адмін</span>':''}<span class="time">${new Date(msg.date).toLocaleString('uk-UA')}</span><br>${escapeHtml(msg.message)}</div>`;
+            });
+        }
+        html += `</div>`;
+        if (userChatWith) html += `<div class="chat-input-area"><input type="text" id="user-chat-input" placeholder="Повідомлення..."><button onclick="sendUserMessage()">Надіслати</button></div>`;
+        container.innerHTML = html;
+        const chatDiv = document.getElementById('user-chat-messages');
+        if (chatDiv) chatDiv.scrollTop = chatDiv.scrollHeight;
+    }
+    function sendUserMessage() {
+        const input = document.getElementById('user-chat-input');
+        const message = input.value.trim();
+        if (!message || !userChatWith) return;
+        const privateData = loadPrivate();
+        if (!privateData[userChatWith]) privateData[userChatWith] = [];
+        privateData[userChatWith].push({ from: currentUser.username, message, date: new Date().toISOString() });
+        savePrivate(privateData);
+        input.value = '';
+        renderUserChat();
+    }
+
+    // ========== USER TABS ==========
+    function showUserTab(tab) {
+        currentUserTab = tab;
+        ['home','shop','casino','cart','chat','history'].forEach(t => {
+            document.getElementById(`utab-content-${t}`).classList.add('hidden');
+            document.getElementById(`utab-${t}`).classList.remove('active');
+        });
+        document.getElementById(`utab-content-${tab}`).classList.remove('hidden');
+        document.getElementById(`utab-${tab}`).classList.add('active');
+        if (tab === 'home') renderUserHome();
+        if (tab === 'shop') renderUserShop();
+        if (tab === 'casino') renderUserCasino();
+        if (tab === 'cart') renderUserCart();
+        if (tab === 'chat') renderUserChat();
+        if (tab === 'history') renderUserHistory();
+    }
+    function renderUserHome() {
+        refreshCurrentUser();
+        document.getElementById('utab-content-home').innerHTML = `<h3>Ваш баланс</h3><div class="balance-big">${currentUser.balance.toFixed(2)} грн</div>
+        <div style="margin-top:20px;"><h4>Швидкий переказ</h4><div class="flex-row"><input type="text" id="transfer-to" placeholder="Отримувач"><input type="number" id="transfer-amount" placeholder="Сума" step="0.01" min="0.01" style="width:120px;"><button onclick="makeTransfer()">Відправити</button></div></div>`;
+    }
+    function makeTransfer() {
+        const toUser = document.getElementById('transfer-to').value.trim();
+        const amount = parseFloat(document.getElementById('transfer-amount').value);
+        if (!toUser || isNaN(amount) || amount <= 0) { showToast('Заповніть коректно', 'error'); return; }
+        if (toUser === currentUser.username) { showToast('Не можна собі', 'error'); return; }
+        if (amount > currentUser.balance) { showToast('Недостатньо коштів', 'error'); return; }
+        const users = loadUsers();
+        const sender = users.find(u => u.username === currentUser.username);
+        const receiver = users.find(u => u.username === toUser);
+        if (!receiver) { showToast('Отримувача не знайдено', 'error'); return; }
+        if (receiver.status === 'blocked') { showToast('Отримувач заблокований', 'error'); return; }
+        sender.balance -= amount;
+        receiver.balance += amount;
+        saveUsers(users);
+        const transfers = loadTransfers();
+        transfers.push({ from: currentUser.username, to: toUser, amount, date: new Date().toISOString() });
+        saveTransfers(transfers);
+        showToast(`Переказано ${amount.toFixed(2)} грн для ${toUser}`);
+        renderUserHome();
+    }
+    function renderUserShop() {
+        refreshCurrentUser();
+        const products = loadProducts();
+        const container = document.getElementById('utab-content-shop');
+        let html = `<h3>Магазин</h3><div class="flex-row"><input type="text" id="shop-search" placeholder="Пошук..." oninput="renderUserShop()"></div>`;
+        if (products.length === 0) html += `<p>Немає товарів.</p>`;
+        else {
+            const search = document.getElementById('shop-search')?.value.toLowerCase() || '';
+            const filtered = products.filter(p => p.name.toLowerCase().includes(search));
+            html += `<div class="table-wrap"><table><thead><tr><th>Товар</th><th>Ціна</th><th></th></tr></thead><tbody>`;
+            filtered.forEach(p => {
+                const finalPrice = p.price * (1 - p.discount/100);
+                const idx = products.indexOf(p);
+                html += `<tr><td>${escapeHtml(p.name)} ${p.discount>0?`<span class="discount-badge">-${p.discount}%</span>`:''}</td><td>${p.discount>0?`<span class="original-price">${p.price.toFixed(2)}</span>`:''} ${finalPrice.toFixed(2)} грн</td><td><button class="btn-sm" onclick="addToCart(${idx})">🛒</button></td></tr>`;
+            });
+            html += `</tbody></table></div>`;
+        }
+        container.innerHTML = html;
+    }
+    function addToCart(idx) { if(!currentUser||currentUser.role!=='user')return; if(!userCart[currentUser.username]) userCart[currentUser.username]=[]; userCart[currentUser.username].push(idx); updateCartCount(); showToast('Товар додано'); }
+    function updateCartCount() { document.getElementById('cart-count').textContent = userCart[currentUser.username]?.length||0; }
+    function renderUserCart() {
+        refreshCurrentUser();
+        const cart = userCart[currentUser.username] || [];
+        const products = loadProducts();
+        const container = document.getElementById('utab-content-cart');
+        if (cart.length===0) { container.innerHTML=`<h3>Кошик порожній</h3>`; return; }
+        let total=0;
+        let html=`<h3>Кошик</h3><div class="table-wrap"><table><thead><tr><th>Товар</th><th>Ціна</th><th></th></tr></thead><tbody>`;
+        cart.forEach((pidx,cidx)=>{
+            const p=products[pidx];
+            if(!p)return;
+            const price=p.price*(1-p.discount/100);
+            total+=price;
+            html+=`<tr><td>${escapeHtml(p.name)}</td><td>${price.toFixed(2)} грн</td><td><button class="danger btn-sm" onclick="removeFromCart(${cidx})">✕</button></td></tr>`;
+        });
+        html+=`</tbody></table></div><div style="margin-top:12px;">Загалом: <strong>${total.toFixed(2)} грн</strong></div>
+        ${getCashbackPercent()>0?`<div style="color:#34C759;">Кешбек: +${(total*getCashbackPercent()/100).toFixed(2)} грн</div>`:''}
+        <div class="flex-row" style="margin-top:12px;"><button onclick="checkoutCart()">Оформити</button><button class="secondary" onclick="clearCart()">Очистити</button></div>`;
+        container.innerHTML=html;
+    }
+    function removeFromCart(cidx){ userCart[currentUser.username].splice(cidx,1); updateCartCount(); renderUserCart(); }
+    function clearCart(){ userCart[currentUser.username]=[]; updateCartCount(); renderUserCart(); }
+    function checkoutCart(){
+        const cart=userCart[currentUser.username]||[];
+        if(cart.length===0)return;
+        const products=loadProducts();
+        let total=0;
+        const items=[];
+        for(let idx of cart){
+            const p=products[idx];
+            if(!p)continue;
+            const price=p.price*(1-p.discount/100);
+            total+=price;
+            items.push({name:p.name,price});
+        }
+        if(total>currentUser.balance){ showToast('Недостатньо коштів!','error'); return; }
+        const users=loadUsers();
+        const user=users.find(u=>u.username===currentUser.username);
+        user.balance-=total;
+        const cash=getCashbackPercent();
+        const cashAmt=total*cash/100;
+        if(cashAmt>0)user.balance+=cashAmt;
+        saveUsers(users);
+        const orders=loadOrders();
+        items.forEach(item=>orders.push({username:currentUser.username,productName:item.name,price:item.price,status:'pending',date:new Date().toISOString()}));
+        saveOrders(orders);
+        clearCart();
+        refreshCurrentUser();
+        showToast(`Замовлення оформлено!`);
+        renderUserCart(); renderUserHome();
+    }
+    function renderUserHistory(){
+        refreshCurrentUser();
+        const orders=loadOrders().filter(o=>o.username===currentUser.username);
+        const transfers=loadTransfers().filter(t=>t.from===currentUser.username||t.to===currentUser.username);
+        const container=document.getElementById('utab-content-history');
+        let html=`<h3>Покупки</h3>`;
+        if(orders.length===0)html+=`<p>Немає</p>`;
+        else{ html+=`<div class="table-wrap"><table><thead><tr><th>Товар</th><th>Ціна</th><th>Статус</th><th>Дата</th></tr></thead><tbody>`;
+            orders.forEach(o=>{ const st=o.status||'pending';
+                html+=`<tr><td>${escapeHtml(o.productName)}</td><td>${o.price.toFixed(2)} грн</td><td><span class="status-badge ${st==='ready'?'status-ready':(st==='rejected'?'status-rejected':'status-pending')}">${st==='ready'?'Готовий':(st==='rejected'?'Відмовлено':'В обробці')}</span></td><td>${new Date(o.date).toLocaleString('uk-UA')}</td></tr>`; });
+            html+=`</tbody></table></div>`; }
+        html+=`<h3 style="margin-top:20px;">Перекази</h3>`;
+        if(transfers.length===0)html+=`<p>Немає</p>`;
+        else{ html+=`<div class="table-wrap"><table><thead><tr><th>Тип</th><th>Користувач</th><th>Сума</th><th>Дата</th></tr></thead><tbody>`;
+            transfers.forEach(t=>{ const type=t.from===currentUser.username?'Відправлено':'Отримано'; const other=t.from===currentUser.username?t.to:t.from;
+                html+=`<tr><td>${type}</td><td>${escapeHtml(other)}</td><td>${t.amount.toFixed(2)} грн</td><td>${new Date(t.date).toLocaleString('uk-UA')}</td></tr>`; });
+            html+=`</tbody></table></div>`; }
+        container.innerHTML=html;
+    }
+    function renderUserCasino() {
+        refreshCurrentUser();
+        document.getElementById('utab-content-casino').innerHTML = `<h3>🎰 Казино</h3><p>Баланс: <strong>${currentUser.balance.toFixed(2)} грн</strong></p>
+        <div class="slot" id="slot-row"><div class="slot-item">❓</div><div class="slot-item">❓</div><div class="slot-item">❓</div></div>
+        <div class="flex-row" style="margin-top:12px;"><input type="number" id="bet-amount" placeholder="Ставка" step="0.01" min="1" value="10" style="width:100px;"><button id="spin-btn" onclick="spinSlots()">Крутити</button></div>`;
+    }
+    const slotSymbols = ['7️⃣', '🍒', '🍋', '💎', 'BAR'];
+    function spinSlots() {
+        if (casinoLocked) return;
+        const bet = parseFloat(document.getElementById('bet-amount').value);
+        if (isNaN(bet) || bet <= 0) { showToast('Введіть ставку', 'error'); return; }
+        if (bet > currentUser.balance) { showToast('Недостатньо коштів', 'error'); return; }
+        const users = loadUsers();
+        const user = users.find(u => u.username === currentUser.username);
+        user.balance -= bet;
+        saveUsers(users);
+        casinoLocked = true;
+        document.getElementById('spin-btn').disabled = true;
+        const items = document.querySelectorAll('.slot-item');
+        let interval = setInterval(() => { items.forEach(item => { item.textContent = slotSymbols[Math.floor(Math.random() * slotSymbols.length)]; }); }, 80);
+        setTimeout(() => {
+            clearInterval(interval);
+            const chances = getCasinoChances();
+            const rand = Math.random() * 100;
+            let resultType, comboSymbols;
+            if (rand < chances.jackpot) { resultType = 'jackpot'; const sym = slotSymbols[Math.floor(Math.random()*slotSymbols.length)]; comboSymbols = [sym, sym, sym]; }
+            else if (rand < chances.jackpot + chances.win) { resultType = 'win'; const s1 = slotSymbols[Math.floor(Math.random()*slotSymbols.length)]; let s3; do { s3 = slotSymbols[Math.floor(Math.random()*slotSymbols.length)]; } while(s3===s1); comboSymbols = [s1, s1, s3]; }
+            else if (rand < chances.jackpot + chances.win + chances.lose) { resultType = 'lose'; comboSymbols = []; while(comboSymbols.length<3) { const s = slotSymbols[Math.floor(Math.random()*slotSymbols.length)]; if(!comboSymbols.includes(s)) comboSymbols.push(s); } }
+            else { resultType = 'return'; comboSymbols = []; while(comboSymbols.length<3) { const s = slotSymbols[Math.floor(Math.random()*slotSymbols.length)]; if(!comboSymbols.includes(s)) comboSymbols.push(s); } }
+            for (let i=0; i<3; i++) items[i].textContent = comboSymbols[i];
+            const freshUsers = loadUsers();
+            const freshUser = freshUsers.find(u => u.username === currentUser.username);
+            if (!freshUser) { casinoLocked = false; document.getElementById('spin-btn').disabled = false; return; }
+            let winAmount = 0;
+            if (resultType === 'jackpot') winAmount = bet * 10;
+            else if (resultType === 'win') winAmount = bet * 2;
+            else if (resultType === 'return') winAmount = bet;
+            freshUser.balance += winAmount;
+            saveUsers(freshUsers);
+            currentUser = freshUser;
+            renderUserCasino();
+            showToast(winAmount>0?`Виграш ${winAmount.toFixed(2)} грн!`:'Програш');
+            casinoLocked = false;
+            document.getElementById('spin-btn').disabled = false;
+        }, 2000);
+    }
+
     function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+    setInterval(() => {
+        const now = new Date();
+        const orders = loadOrders();
+        const filtered = orders.filter(order => (now - new Date(order.date)) / 3600000 <= 24);
+        if (filtered.length < orders.length) saveOrders(filtered);
+    }, 60000);
+
     initData();
 </script>
 </body>
